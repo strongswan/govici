@@ -2,6 +2,7 @@
 package vici
 
 import (
+	"errors"
 	"reflect"
 )
 
@@ -29,6 +30,12 @@ type message struct {
 	data map[string]interface{}
 }
 
+func newMessage() *message {
+	return &message{
+		data: make(map[string]interface{}),
+	}
+}
+
 func (m *message) encode() ([]byte, error) {
 	b := make([]byte, 0)
 
@@ -39,15 +46,15 @@ func (m *message) encode() ([]byte, error) {
 
 		case reflect.String:
 			uv := v.(string)
-			b = append(b, encodeKeyValue(k, uv)...)
+			b = append(b, m.encodeKeyValue(k, uv)...)
 
 		case reflect.Slice, reflect.Array:
 			uv := v.([]string)
-			b = append(b, encodeList(k, uv)...)
+			b = append(b, m.encodeList(k, uv)...)
 
 		case reflect.Map:
 			uv := v.(map[string]interface{})
-			b = append(b, encodeSection(k, uv)...)
+			b = append(b, m.encodeSection(k, uv)...)
 		}
 	}
 
@@ -55,6 +62,55 @@ func (m *message) encode() ([]byte, error) {
 }
 
 func (m *message) decode(data []byte) error {
+	index := 0
+
+	for index < len(data) {
+		// Determine the next message element
+		switch data[index] {
+
+		case msgKeyValue:
+			index += m.decodeKeyValue(data[index+1:])
+
+		case msgListStart:
+			n, err := m.decodeList(data[index+1:])
+			if err != nil {
+				return err
+			}
+			index += n + 1
+
+			if index >= len(data) {
+				return errors.New("number of bytes decoded exceeds data length")
+			}
+
+			// Ensure that the list was completely decoded
+			if data[index] != msgListEnd {
+				return errors.New("expected end of list item")
+			}
+
+		case msgSectionStart:
+			n, err := m.decodeSection(data[index+1:])
+			if err != nil {
+				return err
+			}
+			index += n + 1
+
+			if index >= len(data) {
+				return errors.New("number of bytes decoded exceeds data length")
+			}
+
+			// Ensure that the section was completely decoded
+			if data[index] != msgSectionEnd {
+				return errors.New("expected end of section")
+			}
+		}
+		index += 1
+	}
+
+	// Ensure that all the data was decoded
+	if index != len(data) {
+		return errors.New("unexpected additional data after decode")
+	}
+
 	return nil
 }
 
@@ -63,7 +119,7 @@ func (m *message) decode(data []byte) error {
 // The size of the byte slice is the length of the key and value, plus four bytes:
 // one byte for message element type, one byte for key length, and two bytes for value
 // length.
-func encodeKeyValue(key, value string) []byte {
+func (m *message) encodeKeyValue(key, value string) []byte {
 	keyLen := len(key)
 	valueLen := len(value)
 
@@ -96,7 +152,7 @@ func encodeKeyValue(key, value string) []byte {
 // the list (sum of length of the items in the list), plus three bytes for each
 // list item: one for message element type, and two for item length. Another three
 // bytes are used to indicate list start and list stop, and the length of the key.
-func encodeList(key string, list []string) []byte {
+func (m *message) encodeList(key string, list []string) []byte {
 	listLen := len(key) + 3
 	for _, v := range list {
 		listLen += len(v) + 3
@@ -119,13 +175,16 @@ func encodeList(key string, list []string) []byte {
 
 		// Indicate a new list item
 		b[index] = msgListItem
+
+		// Provide the length of the item with 16 bytes
 		b[index+1] = uint8(itemLen >> 8)
 		b[index+2] = uint8(itemLen & 0xff)
 
+		index += 3
 		for i, v := range []byte(item) {
-			b[index+i+3] = v
+			b[index+i] = v
 		}
-		index += itemLen + 3
+		index += itemLen
 	}
 
 	// Indicate the end of the list
@@ -135,7 +194,7 @@ func encodeList(key string, list []string) []byte {
 }
 
 // encodeSection will return a byte slice of an encoded section
-func encodeSection(key string, section map[string]interface{}) []byte {
+func (m *message) encodeSection(key string, section map[string]interface{}) []byte {
 	// Start with a byte slice big enough for section start and key. Append for
 	// section elements.
 	b := make([]byte, len(key)+2)
@@ -157,15 +216,15 @@ func encodeSection(key string, section map[string]interface{}) []byte {
 
 		case reflect.String:
 			uv := v.(string)
-			b = append(b, encodeKeyValue(k, uv)...)
+			b = append(b, m.encodeKeyValue(k, uv)...)
 
 		case reflect.Slice, reflect.Array:
 			uv := v.([]string)
-			b = append(b, encodeList(k, uv)...)
+			b = append(b, m.encodeList(k, uv)...)
 
 		case reflect.Map:
 			uv := v.(map[string]interface{})
-			b = append(b, encodeSection(k, uv)...)
+			b = append(b, m.encodeSection(k, uv)...)
 
 			// TODO: panic or return error on default?
 		}
@@ -175,4 +234,115 @@ func encodeSection(key string, section map[string]interface{}) []byte {
 	b = append(b, msgSectionEnd)
 
 	return b
+}
+
+// decodeKeyValue will decode a key-value pair and write it to the message's
+// data, and returns the number of bytes decoded.
+func (m *message) decodeKeyValue(data []byte) int {
+	index := 1
+
+	// Read the key
+	keyLen := int(data[0])
+	key := string(data[index : index+keyLen])
+	index += keyLen
+
+	// Read the value
+	valueLen := int(data[index])<<8 + int(data[index+1])
+	index += 2
+
+	value := string(data[index : index+valueLen])
+
+	// Write the key-value pair
+	m.data[key] = value
+
+	// Return the length of the key and value, plus the three bytes for their
+	// lengths
+	return keyLen + valueLen + 3
+}
+
+// decodeList will decode a list and write it to the message's data, and return
+// the number of bytes decoded.
+func (m *message) decodeList(data []byte) (int, error) {
+	var list []string
+
+	index := 1
+
+	// Read the key
+	keyLen := int(data[0])
+	key := string(data[index : index+keyLen])
+	index += keyLen
+
+	for data[index] != msgListEnd {
+		// Ensure this is the beginning of a list item
+		if data[index] != msgListItem {
+			return -1, errors.New("expected beginning of list item")
+		}
+		itemLen := int(data[index+1])<<8 + int(data[index+2])
+		index += 3
+
+		list = append(list, string(data[index:index+itemLen]))
+
+		// Set the new index
+		index += itemLen
+	}
+
+	m.data[key] = list
+
+	return index, nil
+}
+
+// decodeSection will decode a section into a message's data, and return the number
+// of bytes decoded.
+func (m *message) decodeSection(data []byte) (int, error) {
+	section := newMessage()
+
+	index := 1
+
+	// Read the key
+	keyLen := int(data[0])
+	key := string(data[index : index+keyLen])
+	index += keyLen
+
+	for data[index] != msgSectionEnd {
+		// Determine the next message element
+		switch data[index] {
+
+		case msgKeyValue:
+			n := section.decodeKeyValue(data[index+1:])
+			index += n + 1
+
+		case msgListStart:
+			n, err := section.decodeList(data[index+1:])
+			if err != nil {
+				return -1, err
+			}
+			index += n + 1
+
+			// Ensure that the list was completely decoded
+			if data[index] != msgListEnd {
+				return -1, errors.New("expected end of list item")
+			}
+			index += 1
+
+		case msgSectionStart:
+			n, err := section.decodeSection(data[index+1:])
+			if err != nil {
+				return -1, err
+			}
+			index += n + 1
+
+			// Ensure that the section was completely decoded
+			if data[index] != msgSectionEnd {
+				return -1, errors.New("expected end of section")
+			}
+			index += 1
+
+		default:
+			return -1, errors.New("expected key-value pair or the beginning of a section or list")
+		}
+	}
+
+	m.data[key] = section.data
+
+	return index, nil
 }
