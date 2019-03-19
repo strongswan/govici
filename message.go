@@ -39,28 +39,53 @@ func newMessage() *message {
 }
 
 func (m *message) encode() ([]byte, error) {
-	b := make([]byte, 0)
+	buf := bytes.NewBuffer([]byte{})
 
 	for k, v := range m.data {
 		rv := reflect.ValueOf(v)
+
+		var (
+			data []byte
+			err  error
+		)
 
 		switch rv.Kind() {
 
 		case reflect.String:
 			uv := v.(string)
-			b = append(b, m.encodeKeyValue(k, uv)...)
+
+			data, err = m.encodeKeyValue(k, uv)
+			if err != nil {
+				return []byte{}, err
+			}
 
 		case reflect.Slice, reflect.Array:
 			uv := v.([]string)
-			b = append(b, m.encodeList(k, uv)...)
+
+			data, err = m.encodeList(k, uv)
+			if err != nil {
+				return []byte{}, err
+			}
 
 		case reflect.Map:
 			uv := v.(map[string]interface{})
-			b = append(b, m.encodeSection(k, uv)...)
+
+			data, err = m.encodeSection(k, uv)
+			if err != nil {
+				return []byte{}, err
+			}
+
+		default:
+			return []byte{}, errors.New("unsupported data type")
+		}
+
+		_, err = buf.Write(data)
+		if err != nil {
+			return []byte{}, err
 		}
 	}
 
-	return b, nil
+	return buf.Bytes(), nil
 }
 
 func (m *message) decode(data []byte) error {
@@ -111,31 +136,39 @@ func (m *message) decode(data []byte) error {
 // The size of the byte slice is the length of the key and value, plus four bytes:
 // one byte for message element type, one byte for key length, and two bytes for value
 // length.
-func (m *message) encodeKeyValue(key, value string) []byte {
-	keyLen := len(key)
-	valueLen := len(value)
+func (m *message) encodeKeyValue(key, value string) ([]byte, error) {
+	// Initialize buffer to indictate the message element type
+	// is a key-value pair
+	buf := bytes.NewBuffer([]byte{msgKeyValue})
 
-	b := make([]byte, keyLen+valueLen+4)
-
-	// Indicate that the message element type is key-value
-	b[0] = msgKeyValue
-
-	// Add the key
-	b[1] = uint8(keyLen)
-	for i, v := range []byte(key) {
-		b[i+2] = v
+	// Write the key length and key
+	err := buf.WriteByte(uint8(len(key)))
+	if err != nil {
+		return []byte{}, err
 	}
 
-	index := keyLen
-
-	// Add the value
-	b[index+2] = uint8(valueLen >> 8)
-	b[index+3] = uint8(valueLen & 0xff)
-	for i, v := range []byte(value) {
-		b[index+i+4] = v
+	_, err = buf.WriteString(key)
+	if err != nil {
+		return []byte{}, err
 	}
 
-	return b
+	// Write the value's length to the buffer as two bytes
+	vl := []byte{
+		uint8(len(value) >> 8),
+		uint8(len(value) & 0xff),
+	}
+	_, err = buf.Write(vl)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	// Write the value to the buffer
+	_, err = buf.WriteString(value)
+	if err != nil {
+		return []byte{}, err
+	}
+
+	return buf.Bytes(), nil
 }
 
 // encodeList will return a byte slice of an encoded list.
@@ -144,88 +177,119 @@ func (m *message) encodeKeyValue(key, value string) []byte {
 // the list (sum of length of the items in the list), plus three bytes for each
 // list item: one for message element type, and two for item length. Another three
 // bytes are used to indicate list start and list stop, and the length of the key.
-func (m *message) encodeList(key string, list []string) []byte {
-	listLen := len(key) + 3
-	for _, v := range list {
-		listLen += len(v) + 3
+func (m *message) encodeList(key string, list []string) ([]byte, error) {
+	// Initialize buffer to indictate the message element type
+	// is the start of a list
+	buf := bytes.NewBuffer([]byte{msgListStart})
+
+	// Write the key length and key
+	err := buf.WriteByte(uint8(len(key)))
+	if err != nil {
+		return []byte{}, err
 	}
 
-	b := make([]byte, listLen)
-
-	// Indicate that this is the start of a list
-	b[0] = msgListStart
-
-	// Add the list key
-	b[1] = uint8(len(key))
-	for i, v := range []byte(key) {
-		b[i+2] = v
+	_, err = buf.WriteString(key)
+	if err != nil {
+		return []byte{}, err
 	}
 
-	index := len(key) + 2
 	for _, item := range list {
-		itemLen := len(item)
+		// Indicate that this is a list item
+		err = buf.WriteByte(uint8(msgListItem))
 
-		// Indicate a new list item
-		b[index] = msgListItem
-
-		// Provide the length of the item with 16 bytes
-		b[index+1] = uint8(itemLen >> 8)
-		b[index+2] = uint8(itemLen & 0xff)
-
-		index += 3
-		for i, v := range []byte(item) {
-			b[index+i] = v
+		// Write the item's length to the buffer as two bytes
+		il := []byte{
+			uint8(len(item) >> 8),
+			uint8(len(item) & 0xff),
 		}
-		index += itemLen
+		_, err = buf.Write(il)
+		if err != nil {
+			return []byte{}, err
+		}
+
+		// Write the item to the buffer
+		_, err = buf.WriteString(item)
+		if err != nil {
+			return []byte{}, err
+		}
 	}
 
 	// Indicate the end of the list
-	b[index] = msgListEnd
+	err = buf.WriteByte(uint8(msgListEnd))
+	if err != nil {
+		return []byte{}, err
+	}
 
-	return b
+	return buf.Bytes(), nil
 }
 
 // encodeSection will return a byte slice of an encoded section
-func (m *message) encodeSection(key string, section map[string]interface{}) []byte {
-	// Start with a byte slice big enough for section start and key. Append for
-	// section elements.
-	b := make([]byte, len(key)+2)
+func (m *message) encodeSection(key string, section map[string]interface{}) ([]byte, error) {
+	// Initialize buffer to indictate the message element type
+	// is the start of a section
+	buf := bytes.NewBuffer([]byte{msgSectionStart})
 
-	// Indicate the start of a section
-	b[0] = msgSectionStart
+	// Write the key length and key
+	err := buf.WriteByte(uint8(len(key)))
+	if err != nil {
+		return []byte{}, err
+	}
 
-	// Add the section key
-	b[1] = uint8(len(key))
-	for i, v := range []byte(key) {
-		b[i+2] = v
+	_, err = buf.WriteString(key)
+	if err != nil {
+		return []byte{}, err
 	}
 
 	// Encode the sections elements
 	for k, v := range section {
 		rv := reflect.ValueOf(v)
 
+		var data []byte
+
 		switch rv.Kind() {
 
 		case reflect.String:
 			uv := v.(string)
-			b = append(b, m.encodeKeyValue(k, uv)...)
+
+			data, err = m.encodeKeyValue(k, uv)
+			if err != nil {
+				return []byte{}, err
+			}
 
 		case reflect.Slice, reflect.Array:
 			uv := v.([]string)
-			b = append(b, m.encodeList(k, uv)...)
+
+			data, err = m.encodeList(k, uv)
+			if err != nil {
+				return []byte{}, err
+			}
 
 		case reflect.Map:
 			uv := v.(map[string]interface{})
-			b = append(b, m.encodeSection(k, uv)...)
 
-			// TODO: panic or return error on default?
+			data, err = m.encodeSection(k, uv)
+			if err != nil {
+				return []byte{}, err
+			}
+
+		default:
+			return []byte{}, errors.New("unsupported data type")
 		}
+
+		_, err = buf.Write(data)
+		if err != nil {
+			return []byte{}, err
+		}
+
 	}
 
 	// Indicate the end of the section
-	b = append(b, msgSectionEnd)
+	err = buf.WriteByte(uint8(msgSectionEnd))
+	if err != nil {
+		return []byte{}, err
+	}
 
-	return b
+	return buf.Bytes(), nil
 }
 
 // decodeKeyValue will decode a key-value pair and write it to the message's
