@@ -2,7 +2,9 @@
 package vici
 
 import (
+	"bytes"
 	"errors"
+	"io"
 	"reflect"
 )
 
@@ -62,53 +64,43 @@ func (m *message) encode() ([]byte, error) {
 }
 
 func (m *message) decode(data []byte) error {
-	index := 0
+	buf := bytes.NewBuffer(data)
 
-	for index < len(data) {
-		// Determine the next message element
-		switch data[index] {
-
-		case msgKeyValue:
-			index += m.decodeKeyValue(data[index+1:])
-
-		case msgListStart:
-			n, err := m.decodeList(data[index+1:])
-			if err != nil {
-				return err
-			}
-			index += n + 1
-
-			if index >= len(data) {
-				return errors.New("number of bytes decoded exceeds data length")
-			}
-
-			// Ensure that the list was completely decoded
-			if data[index] != msgListEnd {
-				return errors.New("expected end of list item")
-			}
-
-		case msgSectionStart:
-			n, err := m.decodeSection(data[index+1:])
-			if err != nil {
-				return err
-			}
-			index += n + 1
-
-			if index >= len(data) {
-				return errors.New("number of bytes decoded exceeds data length")
-			}
-
-			// Ensure that the section was completely decoded
-			if data[index] != msgSectionEnd {
-				return errors.New("expected end of section")
-			}
-		}
-		index += 1
+	b, err := buf.ReadByte()
+	if err != nil {
+		return err
 	}
 
-	// Ensure that all the data was decoded
-	if index != len(data) {
-		return errors.New("unexpected additional data after decode")
+	for buf.Len() > 0 {
+		// Determine the next message element
+		switch b {
+
+		case msgKeyValue:
+			n, err := m.decodeKeyValue(buf.Bytes())
+			if err != nil {
+				return err
+			}
+			buf.Next(n)
+
+		case msgListStart:
+			n, err := m.decodeList(buf.Bytes())
+			if err != nil {
+				return err
+			}
+			buf.Next(n)
+
+		case msgSectionStart:
+			n, err := m.decodeSection(buf.Bytes())
+			if err != nil {
+				return err
+			}
+			buf.Next(n)
+		}
+
+		b, err = buf.ReadByte()
+		if err != nil && err != io.EOF {
+			return err
+		}
 	}
 
 	return nil
@@ -238,26 +230,40 @@ func (m *message) encodeSection(key string, section map[string]interface{}) []by
 
 // decodeKeyValue will decode a key-value pair and write it to the message's
 // data, and returns the number of bytes decoded.
-func (m *message) decodeKeyValue(data []byte) int {
-	index := 1
+func (m *message) decodeKeyValue(data []byte) (int, error) {
+	buf := bytes.NewBuffer(data)
 
-	// Read the key
-	keyLen := int(data[0])
-	key := string(data[index : index+keyLen])
-	index += keyLen
+	// Read the key from the buffer
+	n, err := buf.ReadByte()
+	if err != nil {
+		return -1, err
+	}
 
-	// Read the value
-	valueLen := int(data[index])<<8 + int(data[index+1])
-	index += 2
+	keyLen := int(n)
+	key := string(buf.Next(keyLen))
+	if len(key) != keyLen {
+		return -1, errors.New("expected key length does not match actual length")
+	}
 
-	value := string(data[index : index+valueLen])
+	// Read the value's length
+	v := buf.Next(2)
+	if len(v) != 2 {
+		return -1, errors.New("unexpected end of buffer")
 
-	// Write the key-value pair
+	}
+
+	// Read the value from the buffer
+	valueLen := int(v[0])<<8 + int(v[1])
+	value := string(buf.Next(valueLen))
+	if len(value) != valueLen {
+		return -1, errors.New("expected value length does not match actual length")
+	}
+
 	m.data[key] = value
 
 	// Return the length of the key and value, plus the three bytes for their
 	// lengths
-	return keyLen + valueLen + 3
+	return keyLen + valueLen + 3, nil
 }
 
 // decodeList will decode a list and write it to the message's data, and return
@@ -265,30 +271,62 @@ func (m *message) decodeKeyValue(data []byte) int {
 func (m *message) decodeList(data []byte) (int, error) {
 	var list []string
 
-	index := 1
+	buf := bytes.NewBuffer(data)
 
-	// Read the key
-	keyLen := int(data[0])
-	key := string(data[index : index+keyLen])
-	index += keyLen
+	// Read the key from the buffer
+	n, err := buf.ReadByte()
+	if err != nil {
+		return -1, err
+	}
 
-	for data[index] != msgListEnd {
+	keyLen := int(n)
+	key := string(buf.Next(keyLen))
+	if len(key) != keyLen {
+		return -1, errors.New("expected key length does not match actual length")
+	}
+
+	b, err := buf.ReadByte()
+	if err != nil {
+		return -1, err
+	}
+
+	// Keep track of bytes decoded
+	count := keyLen + 2
+
+	// Read the list from the buffer
+	for b != msgListEnd {
 		// Ensure this is the beginning of a list item
-		if data[index] != msgListItem {
+		if b != msgListItem {
 			return -1, errors.New("expected beginning of list item")
 		}
-		itemLen := int(data[index+1])<<8 + int(data[index+2])
-		index += 3
 
-		list = append(list, string(data[index:index+itemLen]))
+		// Read the value's length
+		v := buf.Next(2)
+		if len(v) != 2 {
+			return -1, errors.New("unexpected end of buffer")
 
-		// Set the new index
-		index += itemLen
+		}
+
+		// Read the value from the buffer
+		valueLen := int(v[0])<<8 + int(v[1])
+		value := string(buf.Next(valueLen))
+		if len(value) != valueLen {
+			return -1, errors.New("expected value length does not match actual length")
+		}
+
+		list = append(list, value)
+
+		b, err = buf.ReadByte()
+		if err != nil {
+			return -1, err
+		}
+
+		count += valueLen + 3
 	}
 
 	m.data[key] = list
 
-	return index, nil
+	return count, nil
 }
 
 // decodeSection will decode a section into a message's data, and return the number
@@ -296,53 +334,75 @@ func (m *message) decodeList(data []byte) (int, error) {
 func (m *message) decodeSection(data []byte) (int, error) {
 	section := newMessage()
 
-	index := 1
+	buf := bytes.NewBuffer(data)
 
-	// Read the key
-	keyLen := int(data[0])
-	key := string(data[index : index+keyLen])
-	index += keyLen
+	// Read the key from the buffer
+	n, err := buf.ReadByte()
+	if err != nil {
+		return -1, err
+	}
 
-	for data[index] != msgSectionEnd {
+	keyLen := int(n)
+	key := string(buf.Next(keyLen))
+	if len(key) != keyLen {
+		return -1, errors.New("expected key length does not match actual length")
+	}
+
+	b, err := buf.ReadByte()
+	if err != nil {
+		return -1, err
+	}
+
+	// Keep track of bytes decoded
+	count := keyLen + 2
+
+	for b != msgSectionEnd {
 		// Determine the next message element
-		switch data[index] {
+		switch b {
 
 		case msgKeyValue:
-			n := section.decodeKeyValue(data[index+1:])
-			index += n + 1
+			n, err := section.decodeKeyValue(buf.Bytes())
+			if err != nil {
+				return -1, err
+			}
+			// Skip those decoded bytes
+			buf.Next(n)
+
+			count += n
 
 		case msgListStart:
-			n, err := section.decodeList(data[index+1:])
+			n, err := section.decodeList(buf.Bytes())
 			if err != nil {
 				return -1, err
 			}
-			index += n + 1
+			// Skip those decoded bytes
+			buf.Next(n)
 
-			// Ensure that the list was completely decoded
-			if data[index] != msgListEnd {
-				return -1, errors.New("expected end of list item")
-			}
-			index += 1
+			count += n
 
 		case msgSectionStart:
-			n, err := section.decodeSection(data[index+1:])
+			n, err := section.decodeSection(buf.Bytes())
 			if err != nil {
 				return -1, err
 			}
-			index += n + 1
+			// Skip those decoded bytes
+			buf.Next(n)
 
-			// Ensure that the section was completely decoded
-			if data[index] != msgSectionEnd {
-				return -1, errors.New("expected end of section")
-			}
-			index += 1
+			count += n
 
 		default:
 			return -1, errors.New("expected key-value pair or the beginning of a section or list")
 		}
+
+		b, err = buf.ReadByte()
+		if err != nil {
+			return -1, err
+		}
+
+		count += 1
 	}
 
 	m.data[key] = section.data
 
-	return index, nil
+	return count, nil
 }
