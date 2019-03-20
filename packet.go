@@ -48,6 +48,22 @@ func newPacket(ptype uint8, name string, msg *message) *packet {
 	}
 }
 
+// isNamed returns a bool indicating the packet is a named type
+func (p *packet) isNamed() bool {
+	n := map[uint8]bool{
+		pktCmdRequest:      true,
+		pktCmdResponse:     false,
+		pktCmdUnkown:       false,
+		pktEventRegister:   true,
+		pktEventUnregister: true,
+		pktEventConfirm:    false,
+		pktEventUnknown:    false,
+		pktEvent:           true,
+	}
+
+	return n[p.ptype]
+}
+
 // bytes formats the packet and returns it as a byte slice
 func (p *packet) bytes() ([]byte, error) {
 	// Create a new buffer with the first byte indicating the packet type
@@ -77,4 +93,44 @@ func (p *packet) bytes() ([]byte, error) {
 	}
 
 	return buf.Bytes(), nil
+}
+
+// parse will parse the given bytes and populate its fields with that data
+func (p *packet) parse(data []byte) error {
+	buf := bytes.NewBuffer(data)
+
+	// Read the packet type
+	b, err := buf.ReadByte()
+	if err != nil {
+		return err
+	}
+	p.ptype = b
+
+	// If the packet is unnamed there is nothing more to do
+	if !p.isNamed() {
+		return nil
+	}
+
+	// Get the length of the name
+	l, err := buf.ReadByte()
+	if err != nil {
+		return nil
+	}
+
+	// Read the name
+	name := buf.Next(l)
+	if len(name) != l {
+		return errors.New("expected name length does not match actual length")
+	}
+	p.name = string(name)
+
+	// Decode the message field
+	m := newMessage()
+	err = m.decode(buf.Bytes())
+	if err != nil {
+		return err
+	}
+	p.msg = m
+
+	return nil
 }
