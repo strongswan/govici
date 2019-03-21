@@ -3,6 +3,7 @@ package vici
 
 import (
 	"bytes"
+	"errors"
 )
 
 const (
@@ -70,9 +71,11 @@ func (p *packet) bytes() ([]byte, error) {
 	buf := bytes.NewBuffer([]byte{p.ptype})
 
 	// Write the name, preceeded by its length
-	err := buf.WriteByte(uint8(len(p.name)))
-	if err != nil {
-		return []byte{}, err
+	if p.isNamed() {
+		err := buf.WriteByte(uint8(len(p.name)))
+		if err != nil {
+			return []byte{}, err
+		}
 	}
 
 	_, err := buf.WriteString(p.name)
@@ -80,13 +83,13 @@ func (p *packet) bytes() ([]byte, error) {
 		return []byte{}, err
 	}
 
-	if msg != nil {
-		b, err := msg.encode()
+	if p.msg != nil {
+		b, err := p.msg.encode()
 		if err != nil {
 			return []byte{}, err
 		}
 
-		_, err := buf.Write(b)
+		_, err = buf.Write(b)
 		if err != nil {
 			return []byte{}, err
 		}
@@ -118,8 +121,8 @@ func (p *packet) parse(data []byte) error {
 	}
 
 	// Read the name
-	name := buf.Next(l)
-	if len(name) != l {
+	name := buf.Next(int(l))
+	if len(name) != int(l) {
 		return errors.New("expected name length does not match actual length")
 	}
 	p.name = string(name)
