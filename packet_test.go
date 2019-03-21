@@ -2,6 +2,7 @@ package vici
 
 import (
 	"bytes"
+	"reflect"
 	"testing"
 )
 
@@ -51,12 +52,34 @@ var (
 	}
 )
 
-//func TestPacketParse(t *testing.T) {}
+func TestPacketParse(t *testing.T) {
+	p := &packet{}
+
+	err := p.parse(goldNamedPacketBytes)
+	if err != nil {
+		t.Errorf("Error parsing packet: %v", err)
+	}
+
+	if !reflect.DeepEqual(p, goldNamedPacket) {
+		t.Errorf("Parsed named packet does not equal gold packet.\nExpected: %v\nReceived: %v", goldNamedPacket, p)
+	}
+
+	p = &packet{}
+
+	err = p.parse(goldUnnamedPacketBytes)
+	if err != nil {
+		t.Errorf("Error parsing packet: %v", err)
+	}
+
+	if !reflect.DeepEqual(p, goldUnnamedPacket) {
+		t.Errorf("Parsed unnamed packet does not equal gold packet.\nExpected: %v\nReceived: %v", goldUnnamedPacket, p)
+	}
+}
 
 func TestPacketBytes(t *testing.T) {
 	b, err := goldNamedPacket.bytes()
 	if err != nil {
-		t.Errorf("unexpected error getting packet bytes: %v", err)
+		t.Errorf("Unexpected error getting packet bytes: %v", err)
 	}
 
 	if !bytes.Equal(b, goldNamedPacketBytes) {
@@ -65,7 +88,7 @@ func TestPacketBytes(t *testing.T) {
 
 	b, err = goldUnnamedPacket.bytes()
 	if err != nil {
-		t.Errorf("unexpected error getting packet bytes: %v", err)
+		t.Errorf("Unexpected error getting packet bytes: %v", err)
 	}
 
 	if !bytes.Equal(b, goldUnnamedPacketBytes) {

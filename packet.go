@@ -109,23 +109,20 @@ func (p *packet) parse(data []byte) error {
 	}
 	p.ptype = b
 
-	// If the packet is unnamed there is nothing more to do
-	if !p.isNamed() {
-		return nil
-	}
+	if p.isNamed() {
+		// Get the length of the name
+		l, err := buf.ReadByte()
+		if err != nil {
+			return nil
+		}
 
-	// Get the length of the name
-	l, err := buf.ReadByte()
-	if err != nil {
-		return nil
+		// Read the name
+		name := buf.Next(int(l))
+		if len(name) != int(l) {
+			return errors.New("expected name length does not match actual length")
+		}
+		p.name = string(name)
 	}
-
-	// Read the name
-	name := buf.Next(int(l))
-	if len(name) != int(l) {
-		return errors.New("expected name length does not match actual length")
-	}
-	p.name = string(name)
 
 	// Decode the message field
 	m := newMessage()

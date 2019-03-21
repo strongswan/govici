@@ -22,7 +22,7 @@ var (
 	}
 
 	// Expected byte stream from encoding testMessage
-	goldBytes = []byte{
+	goldMessageBytes = []byte{
 		// key1 = value1
 		3, 4, 'k', 'e', 'y', '1', 0, 6, 'v', 'a', 'l', 'u', 'e', '1',
 		// section1
@@ -52,14 +52,14 @@ func TestMessageEncode(t *testing.T) {
 		t.Errorf("Error encoding test message: %v", err)
 	}
 
-	if !bytes.Equal(b, goldBytes) {
-		t.Errorf("Encoded message does not equal gold bytes.\nExpected: %v\nReceived: %v", goldBytes, b)
+	if !bytes.Equal(b, goldMessageBytes) {
+		t.Errorf("Encoded message does not equal gold bytes.\nExpected: %v\nReceived: %v", goldMessageBytes, b)
 	}
 }
 
 func TestMessageDecode(t *testing.T) {
 	m := newMessage()
-	err := m.decode(goldBytes)
+	err := m.decode(goldMessageBytes)
 	if err != nil {
 		t.Errorf("Error decoding test bytes: %v", err)
 	}
