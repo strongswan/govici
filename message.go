@@ -10,7 +10,7 @@ import (
 
 const (
 	// Begin a new section having a name
-	msgSectionStart = iota + 1
+	msgSectionStart uint8 = iota + 1
 
 	// End a previously started section
 	msgSectionEnd
@@ -195,7 +195,7 @@ func (m *message) encodeList(key string, list []string) ([]byte, error) {
 
 	for _, item := range list {
 		// Indicate that this is a list item
-		err = buf.WriteByte(uint8(msgListItem))
+		err = buf.WriteByte(msgListItem)
 
 		// Write the item's length to the buffer as two bytes
 		il := []byte{
@@ -215,7 +215,7 @@ func (m *message) encodeList(key string, list []string) ([]byte, error) {
 	}
 
 	// Indicate the end of the list
-	err = buf.WriteByte(uint8(msgListEnd))
+	err = buf.WriteByte(msgListEnd)
 	if err != nil {
 		return []byte{}, err
 	}
@@ -284,7 +284,7 @@ func (m *message) encodeSection(key string, section map[string]interface{}) ([]b
 	}
 
 	// Indicate the end of the section
-	err = buf.WriteByte(uint8(msgSectionEnd))
+	err = buf.WriteByte(msgSectionEnd)
 	if err != nil {
 		return []byte{}, err
 	}
