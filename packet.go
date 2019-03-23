@@ -92,7 +92,7 @@ func (p *packet) bytes() ([]byte, error) {
 	// Create a new buffer with the first byte indicating the packet type
 	buf := bytes.NewBuffer([]byte{p.ptype})
 
-	// Write the name, preceeded by its length
+	// Write the name, preceded by its length
 	if p.isNamed() {
 		err := buf.WriteByte(uint8(len(p.name)))
 		if err != nil {

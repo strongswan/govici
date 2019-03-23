@@ -218,6 +218,9 @@ func (m *message) encodeList(key string, list []string) ([]byte, error) {
 	for _, item := range list {
 		// Indicate that this is a list item
 		err = buf.WriteByte(msgListItem)
+		if err != nil {
+			return []byte{}, err
+		}
 
 		// Write the item's length to the buffer as two bytes
 		il := []byte{
@@ -485,7 +488,7 @@ func (m *message) decodeSection(data []byte) (int, error) {
 			return -1, err
 		}
 
-		count += 1
+		count++
 	}
 
 	m.data[key] = section.data
