@@ -25,6 +25,7 @@ package vici
 
 import (
 	"bytes"
+	"encoding/binary"
 	"errors"
 	"io"
 	"reflect"
@@ -175,10 +176,9 @@ func (m *message) encodeKeyValue(key, value string) ([]byte, error) {
 	}
 
 	// Write the value's length to the buffer as two bytes
-	vl := []byte{
-		uint8(len(value) >> 8),
-		uint8(len(value) & 0xff),
-	}
+	vl := make([]byte, 2)
+	binary.BigEndian.PutUint16(vl, uint16(len(value)))
+
 	_, err = buf.Write(vl)
 	if err != nil {
 		return []byte{}, err
@@ -223,10 +223,9 @@ func (m *message) encodeList(key string, list []string) ([]byte, error) {
 		}
 
 		// Write the item's length to the buffer as two bytes
-		il := []byte{
-			uint8(len(item) >> 8),
-			uint8(len(item) & 0xff),
-		}
+		il := make([]byte, 2)
+		binary.BigEndian.PutUint16(il, uint16(len(item)))
+
 		_, err = buf.Write(il)
 		if err != nil {
 			return []byte{}, err
@@ -342,7 +341,7 @@ func (m *message) decodeKeyValue(data []byte) (int, error) {
 	}
 
 	// Read the value from the buffer
-	valueLen := int(v[0])<<8 + int(v[1])
+	valueLen := int(binary.BigEndian.Uint16(v))
 	value := string(buf.Next(valueLen))
 	if len(value) != valueLen {
 		return -1, errors.New("expected value length does not match actual length")
@@ -397,7 +396,7 @@ func (m *message) decodeList(data []byte) (int, error) {
 		}
 
 		// Read the value from the buffer
-		valueLen := int(v[0])<<8 + int(v[1])
+		valueLen := int(binary.BigEndian.Uint16(v))
 		value := string(buf.Next(valueLen))
 		if len(value) != valueLen {
 			return -1, errors.New("expected value length does not match actual length")
