@@ -54,7 +54,7 @@ func (t *transport) send(pkt *packet) error {
 
 	// Write the packet length
 	pl := make([]byte, headerLength)
-	binary.BigEndian.PutUint32(pl, uint32(buf.Len()))
+	binary.BigEndian.PutUint32(pl, uint32(len(b)))
 	_, err = buf.Write(pl)
 	if err != nil {
 		return err

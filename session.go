@@ -23,8 +23,23 @@
 // Package vici implements a strongSwan vici protocol client
 package vici
 
+import (
+	"sync"
+)
+
 // Session is a vici client session
-type Session struct{}
+type Session struct {
+	// Only one command can be active on the transport at a time,
+	// but events may get raised at any time while registered, even
+	// during an active command request command. So, give session two
+	// transports: one is locked with mutex during use, e.g. command
+	// requests (including streamed requests), and the other is used
+	// for listening to registered events.
+	mux sync.Mutex
+	ctr *transport
+
+	el *eventListener
+}
 
 // Version returns daemon and system specific version information.
 func (s *Session) Version() {}
@@ -148,3 +163,14 @@ func (s *Session) GetCounters() {}
 
 // ResetCounters resets global or connection-specific IKE event counters.
 func (s *Session) ResetCounters() {}
+
+// Listen listens for registered events.
+func (s *Session) Listen(events []string) error {
+	return s.el.safeListen(events)
+}
+
+// NextEvent returns the next event seen by Listen. NextEvent is a blocking call - if there
+// is no event in the event buffer, NextEvent will wait until there is.
+func (s *Session) NextEvent() (*Message, error) {
+	return s.el.nextEvent()
+}

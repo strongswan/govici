@@ -60,10 +60,10 @@ type packet struct {
 	ptype uint8
 	name  string
 
-	msg *message
+	msg *Message
 }
 
-func newPacket(ptype uint8, name string, msg *message) *packet {
+func newPacket(ptype uint8, name string, msg *Message) *packet {
 	return &packet{
 		ptype: ptype,
 		name:  name,
@@ -98,11 +98,11 @@ func (p *packet) bytes() ([]byte, error) {
 		if err != nil {
 			return []byte{}, err
 		}
-	}
 
-	_, err := buf.WriteString(p.name)
-	if err != nil {
-		return []byte{}, err
+		_, err = buf.WriteString(p.name)
+		if err != nil {
+			return []byte{}, err
+		}
 	}
 
 	if p.msg != nil {
@@ -147,7 +147,7 @@ func (p *packet) parse(data []byte) error {
 	}
 
 	// Decode the message field
-	m := newMessage()
+	m := NewMessage()
 	err = m.decode(buf.Bytes())
 	if err != nil {
 		return err
