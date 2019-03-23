@@ -25,72 +25,63 @@ package vici
 
 import (
 	"bytes"
-	"encoding/binary"
 	"net"
+	"reflect"
+	"testing"
 )
 
-const (
-	// Default unix socket path
-	viciSocket = "/var/run/charon.vici"
+func TestTransportSend(t *testing.T) {
+	client, srvr := net.Pipe()
+	defer client.Close()
+	defer srvr.Close()
 
-	// Each segment is prefixed by a 4-byte header in network oreder
-	headerLength = 4
+	tr := &transport{
+		conn: client,
+	}
 
-	// Maximum segment length is 512KB
-	maxSegment = 512 * 1024
-)
+	// Send packet and ensure that what is read matches the gold bytes
+	go func() {
+		b := make([]byte, maxSegment)
+		n, err := srvr.Read(b)
+		if err != nil {
+			t.Errorf("Unexpected error reading bytes: %v", err)
+		}
 
-type transport struct {
-	conn net.Conn
+		if !bytes.Equal(b[:n], goldNamedPacketBytes) {
+			t.Errorf("Recieved byte stream does not equal gold bytes.\nExpected: %v\nReceived: %v", goldUnnamedPacketBytes, b)
+		}
+	}()
+
+	err := tr.send(goldNamedPacket)
+	if err != nil {
+		t.Errorf("Unexpected error sending packet: %v", err)
+	}
 }
 
-func (t *transport) send(pkt *packet) error {
-	buf := bytes.NewBuffer([]byte{})
+func TestTransportRecv(t *testing.T) {
+	client, srvr := net.Pipe()
+	defer client.Close()
+	defer srvr.Close()
 
-	b, err := pkt.bytes()
-	if err != nil {
-		return err
+	tr := &transport{
+		conn: client,
 	}
 
-	// Write the packet length
-	pl := make([]byte, headerLength)
-	binary.BigEndian.PutUint32(pl, uint32(buf.Len()))
-	_, err = buf.Write(pl)
+	// Server sends bytes, client reads a returns a packet. Ensure that the
+	// packet is goldNamedPacket
+	go func() {
+		p, err := tr.recv()
+		if err != nil {
+			t.Errorf("Unexpected error receiving packet: %v", err)
+		}
+
+		if !reflect.DeepEqual(p, goldNamedPacket) {
+			t.Errorf("Received packet does not equal gold packet.\nExpected: %v\n Received: %v", goldNamedPacket, p)
+		}
+	}()
+
+	_, err := srvr.Write(goldNamedPacketBytes)
 	if err != nil {
-		return err
+		t.Errorf("Unexpected error sending bytes: %v", err)
 	}
-
-	// Write the payload
-	_, err = buf.Write(b)
-	if err != nil {
-		return err
-	}
-
-	_, err = t.conn.Write(buf.Bytes())
-
-	return err
-}
-
-func (t *transport) recv() (*packet, error) {
-	buf := make([]byte, headerLength)
-
-	_, err := t.conn.Read(buf)
-	if err != nil {
-		return nil, err
-	}
-	pl := binary.BigEndian.Uint32(buf)
-
-	buf = make([]byte, int(pl))
-	_, err = t.conn.Read(buf)
-	if err != nil {
-		return nil, err
-	}
-
-	p := &packet{}
-	err = p.parse(buf)
-	if err != nil {
-		return nil, err
-	}
-
-	return p, nil
 }
