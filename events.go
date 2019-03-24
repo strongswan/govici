@@ -74,6 +74,13 @@ type eventListener struct {
 	mc chan *Message
 }
 
+func newEventListener(t *transport) *eventListener {
+	return &eventListener{
+		transport: t,
+		mc:        make(chan *Message),
+	}
+}
+
 func (el *eventListener) nextEvent() (*Message, error) {
 	m := <-el.mc
 	if m == nil {

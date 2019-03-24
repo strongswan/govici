@@ -40,6 +40,19 @@ const (
 	maxSegment = 512 * 1024
 )
 
+func newTransport(c net.Conn) (*transport, error) {
+	if c != nil {
+		return &transport{c}, nil
+	}
+
+	c, err := net.Dial("unix", viciSocket)
+	if err != nil {
+		return nil, err
+	}
+
+	return &transport{c}, nil
+}
+
 type transport struct {
 	conn net.Conn
 }
