@@ -32,13 +32,22 @@ import (
 var (
 	// Gold message
 	goldMessage = &Message{
+		keys: []string{"key1", "section1"},
 		data: map[string]interface{}{
 			"key1": "value1",
-			"section1": map[string]interface{}{
-				"sub-section": map[string]interface{}{
-					"key2": "value2",
+			// Section is another message
+			"section1": &Message{
+				keys: []string{"sub-section", "list1"},
+				data: map[string]interface{}{
+					// Sub-section is a another message
+					"sub-section": &Message{
+						keys: []string{"key2"},
+						data: map[string]interface{}{
+							"key2": "value2",
+						},
+					},
+					"list1": []string{"item1", "item2"},
 				},
-				"list1": []string{"item1", "item2"},
 			},
 		},
 	}

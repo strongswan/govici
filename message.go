@@ -64,12 +64,78 @@ func (ms *MessageStream) Messages() []*Message {
 }
 
 type Message struct {
+	keys []string
+
 	data map[string]interface{}
 }
 
 func NewMessage() *Message {
 	return &Message{
 		data: make(map[string]interface{}),
+	}
+}
+
+func (m *Message) Set(key string, value interface{}) error {
+	return m.addItem(key, value)
+}
+
+func (m *Message) Get(key string) interface{} {
+	v, ok := m.data[key]
+	if !ok {
+		return nil
+	}
+
+	return v
+}
+
+func (m *Message) addItem(key string, value interface{}) error {
+	rv := reflect.ValueOf(value)
+
+	switch rv.Kind() {
+
+	case reflect.String:
+		m.data[key] = value.(string)
+
+	case reflect.Slice, reflect.Array:
+		list, ok := value.([]string)
+		if !ok {
+			return fmt.Errorf("unsupported type: %v", rv.Kind())
+		}
+		m.data[key] = list
+
+	case reflect.Ptr:
+		msg, ok := value.(*Message)
+		if !ok {
+			return fmt.Errorf("unsupported type: %v", rv.Kind())
+		}
+		m.data[key] = msg
+
+	default:
+		return fmt.Errorf("unsupported type: %v", rv.Kind())
+	}
+
+	m.keys = append(m.keys, key)
+
+	return nil
+}
+
+type messageItem struct {
+	k string
+	v interface{}
+}
+
+func (m *Message) items() chan messageItem {
+	c := make(chan messageItem)
+	go m.orderedIterate(c)
+
+	return c
+}
+
+func (m *Message) orderedIterate(c chan messageItem) {
+	defer close(c)
+
+	for _, k := range m.keys {
+		c <- messageItem{k, m.data[k]}
 	}
 }
 
@@ -88,7 +154,10 @@ func (m *Message) CheckSuccess() error {
 func (m *Message) encode() ([]byte, error) {
 	buf := bytes.NewBuffer([]byte{})
 
-	for k, v := range m.data {
+	for i := range m.items() {
+		k := i.k
+		v := i.v
+
 		rv := reflect.ValueOf(v)
 
 		var (
@@ -114,8 +183,11 @@ func (m *Message) encode() ([]byte, error) {
 				return []byte{}, err
 			}
 
-		case reflect.Map:
-			uv := v.(map[string]interface{})
+		case reflect.Ptr:
+			uv, ok := v.(*Message)
+			if !ok {
+				return []byte{}, errors.New("unsupported data type")
+			}
 
 			data, err = m.encodeSection(k, uv)
 			if err != nil {
@@ -272,7 +344,7 @@ func (m *Message) encodeList(key string, list []string) ([]byte, error) {
 }
 
 // encodeSection will return a byte slice of an encoded section
-func (m *Message) encodeSection(key string, section map[string]interface{}) ([]byte, error) {
+func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
 	// Initialize buffer to indictate the message element type
 	// is the start of a section
 	buf := bytes.NewBuffer([]byte{msgSectionStart})
@@ -289,7 +361,10 @@ func (m *Message) encodeSection(key string, section map[string]interface{}) ([]b
 	}
 
 	// Encode the sections elements
-	for k, v := range section {
+	for i := range section.items() {
+		k := i.k
+		v := i.v
+
 		rv := reflect.ValueOf(v)
 
 		var data []byte
@@ -312,8 +387,11 @@ func (m *Message) encodeSection(key string, section map[string]interface{}) ([]b
 				return []byte{}, err
 			}
 
-		case reflect.Map:
-			uv := v.(map[string]interface{})
+		case reflect.Ptr:
+			uv, ok := v.(*Message)
+			if !ok {
+				return []byte{}, errors.New("unsupported data type")
+			}
 
 			data, err = m.encodeSection(k, uv)
 			if err != nil {
@@ -371,7 +449,10 @@ func (m *Message) decodeKeyValue(data []byte) (int, error) {
 		return -1, errors.New("expected value length does not match actual length")
 	}
 
-	m.data[key] = value
+	err = m.addItem(key, value)
+	if err != nil {
+		return -1, err
+	}
 
 	// Return the length of the key and value, plus the three bytes for their
 	// lengths
@@ -436,7 +517,10 @@ func (m *Message) decodeList(data []byte) (int, error) {
 		count += valueLen + 3
 	}
 
-	m.data[key] = list
+	err = m.addItem(key, list)
+	if err != nil {
+		return -1, err
+	}
 
 	return count, nil
 }
@@ -514,7 +598,10 @@ func (m *Message) decodeSection(data []byte) (int, error) {
 		count++
 	}
 
-	m.data[key] = section.data
+	err = m.addItem(key, section)
+	if err != nil {
+		return -1, err
+	}
 
 	return count, nil
 }
