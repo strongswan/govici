@@ -40,6 +40,19 @@ const (
 	maxSegment = 512 * 1024
 )
 
+func newTransport(c net.Conn) (*transport, error) {
+	if c != nil {
+		return &transport{c}, nil
+	}
+
+	c, err := net.Dial("unix", viciSocket)
+	if err != nil {
+		return nil, err
+	}
+
+	return &transport{c}, nil
+}
+
 type transport struct {
 	conn net.Conn
 }
@@ -54,7 +67,7 @@ func (t *transport) send(pkt *packet) error {
 
 	// Write the packet length
 	pl := make([]byte, headerLength)
-	binary.BigEndian.PutUint32(pl, uint32(buf.Len()))
+	binary.BigEndian.PutUint32(pl, uint32(len(b)))
 	_, err = buf.Write(pl)
 	if err != nil {
 		return err

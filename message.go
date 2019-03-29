@@ -27,6 +27,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"reflect"
 )
@@ -51,17 +52,40 @@ const (
 	msgListEnd
 )
 
-type message struct {
+// MessageStream is used to feed continuous data during a command request.
+type MessageStream struct {
+	// Message list
+	messages []*Message
+}
+
+// Messages returns the messages received from the streamed request.
+func (ms *MessageStream) Messages() []*Message {
+	return ms.messages
+}
+
+type Message struct {
 	data map[string]interface{}
 }
 
-func newMessage() *message {
-	return &message{
+func NewMessage() *Message {
+	return &Message{
 		data: make(map[string]interface{}),
 	}
 }
 
-func (m *message) encode() ([]byte, error) {
+func (m *Message) CheckSuccess() error {
+	// If the message has a success field, check it. If it's a failure,
+	// return an error using that message.
+	if success, ok := m.data["success"]; ok {
+		if success != "yes" {
+			return fmt.Errorf("command failed: %v", m.data["errmsg"])
+		}
+	}
+
+	return nil
+}
+
+func (m *Message) encode() ([]byte, error) {
 	buf := bytes.NewBuffer([]byte{})
 
 	for k, v := range m.data {
@@ -111,11 +135,11 @@ func (m *message) encode() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (m *message) decode(data []byte) error {
+func (m *Message) decode(data []byte) error {
 	buf := bytes.NewBuffer(data)
 
 	b, err := buf.ReadByte()
-	if err != nil {
+	if err != nil && err != io.EOF {
 		return err
 	}
 
@@ -159,7 +183,7 @@ func (m *message) decode(data []byte) error {
 // The size of the byte slice is the length of the key and value, plus four bytes:
 // one byte for message element type, one byte for key length, and two bytes for value
 // length.
-func (m *message) encodeKeyValue(key, value string) ([]byte, error) {
+func (m *Message) encodeKeyValue(key, value string) ([]byte, error) {
 	// Initialize buffer to indictate the message element type
 	// is a key-value pair
 	buf := bytes.NewBuffer([]byte{msgKeyValue})
@@ -199,7 +223,7 @@ func (m *message) encodeKeyValue(key, value string) ([]byte, error) {
 // the list (sum of length of the items in the list), plus three bytes for each
 // list item: one for message element type, and two for item length. Another three
 // bytes are used to indicate list start and list stop, and the length of the key.
-func (m *message) encodeList(key string, list []string) ([]byte, error) {
+func (m *Message) encodeList(key string, list []string) ([]byte, error) {
 	// Initialize buffer to indictate the message element type
 	// is the start of a list
 	buf := bytes.NewBuffer([]byte{msgListStart})
@@ -248,7 +272,7 @@ func (m *message) encodeList(key string, list []string) ([]byte, error) {
 }
 
 // encodeSection will return a byte slice of an encoded section
-func (m *message) encodeSection(key string, section map[string]interface{}) ([]byte, error) {
+func (m *Message) encodeSection(key string, section map[string]interface{}) ([]byte, error) {
 	// Initialize buffer to indictate the message element type
 	// is the start of a section
 	buf := bytes.NewBuffer([]byte{msgSectionStart})
@@ -318,7 +342,7 @@ func (m *message) encodeSection(key string, section map[string]interface{}) ([]b
 
 // decodeKeyValue will decode a key-value pair and write it to the message's
 // data, and returns the number of bytes decoded.
-func (m *message) decodeKeyValue(data []byte) (int, error) {
+func (m *Message) decodeKeyValue(data []byte) (int, error) {
 	buf := bytes.NewBuffer(data)
 
 	// Read the key from the buffer
@@ -356,7 +380,7 @@ func (m *message) decodeKeyValue(data []byte) (int, error) {
 
 // decodeList will decode a list and write it to the message's data, and return
 // the number of bytes decoded.
-func (m *message) decodeList(data []byte) (int, error) {
+func (m *Message) decodeList(data []byte) (int, error) {
 	var list []string
 
 	buf := bytes.NewBuffer(data)
@@ -419,8 +443,8 @@ func (m *message) decodeList(data []byte) (int, error) {
 
 // decodeSection will decode a section into a message's data, and return the number
 // of bytes decoded.
-func (m *message) decodeSection(data []byte) (int, error) {
-	section := newMessage()
+func (m *Message) decodeSection(data []byte) (int, error) {
+	section := NewMessage()
 
 	buf := bytes.NewBuffer(data)
 

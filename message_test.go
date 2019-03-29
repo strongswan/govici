@@ -31,7 +31,7 @@ import (
 
 var (
 	// Gold message
-	goldMessage = &message{
+	goldMessage = &Message{
 		data: map[string]interface{}{
 			"key1": "value1",
 			"section1": map[string]interface{}{
@@ -80,7 +80,7 @@ func TestMessageEncode(t *testing.T) {
 }
 
 func TestMessageDecode(t *testing.T) {
-	m := newMessage()
+	m := NewMessage()
 	err := m.decode(goldMessageBytes)
 	if err != nil {
 		t.Errorf("Error decoding test bytes: %v", err)
