@@ -72,8 +72,13 @@ func (s *Session) Stats() (*Message, error) {
 
 // ReloadSettings reloads strongswan.conf settings and all plugins supporting
 // configuration reload.
-func (s *Session) ReloadSettings() (*Message, error) {
-	return s.sendRequest("reload-settings", nil)
+func (s *Session) ReloadSettings() error {
+	m, err := s.sendRequest("reload-settings", nil)
+	if err != nil {
+		return err
+	}
+
+	return m.CheckSuccess()
 }
 
 // Initiate initiates an SA.
@@ -98,8 +103,13 @@ func (s *Session) Redirect(msg *Message) (*Message, error) {
 }
 
 // Install installs a trap, drop or bypass policy defined by a CHILD_SA config.
-func (s *Session) Install(msg *Message) (*Message, error) {
-	return s.sendRequest("install", msg)
+func (s *Session) Install(msg *Message) error {
+	m, err := s.sendRequest("install", msg)
+	if err != nil {
+		return err
+	}
+
+	return m.CheckSuccess()
 }
 
 // Uninstall uninstalls a trap, drop or bypass policy defined by a CHILD_SA config.
@@ -149,18 +159,33 @@ func (s *Session) GetAuthorities() (*Message, error) {
 
 // LoadConn loads a single connection definition to the daemon. An existing connection with the same name
 // gets updated or replaced.
-func (s *Session) LoadConn(msg *Message) (*Message, error) {
-	return s.sendRequest("load-conn", msg)
+func (s *Session) LoadConn(msg *Message) error {
+	m, err := s.sendRequest("load-conn", msg)
+	if err != nil {
+		return err
+	}
+
+	return m.CheckSuccess()
 }
 
 // UnloadConn unloads a previously loaded connection by name.
-func (s *Session) UnloadConn(msg *Message) (*Message, error) {
-	return s.sendRequest("unload-conn", msg)
+func (s *Session) UnloadConn(msg *Message) error {
+	m, err := s.sendRequest("unload-conn", msg)
+	if err != nil {
+		return err
+	}
+
+	return m.CheckSuccess()
 }
 
 // LoadCert loads a certificate into the daemon.
-func (s *Session) LoadCert(msg *Message) (*Message, error) {
-	return s.sendRequest("load-cert", msg)
+func (s *Session) LoadCert(msg *Message) error {
+	m, err := s.sendRequest("load-cert", msg)
+	if err != nil {
+		return err
+	}
+
+	return m.CheckSuccess()
 }
 
 // LoadKey loads a private key into the daemon.
@@ -169,8 +194,13 @@ func (s *Session) LoadKey(msg *Message) (*Message, error) {
 }
 
 // UnloadKey unloads a key with the given key identifier.
-func (s *Session) UnloadKey(msg *Message) (*Message, error) {
-	return s.sendRequest("unload-key", msg)
+func (s *Session) UnloadKey(msg *Message) error {
+	m, err := s.sendRequest("unload-key", msg)
+	if err != nil {
+		return err
+	}
+
+	return m.CheckSuccess()
 }
 
 // GetKeys returns a list of identifiers of private keys loaded exclusively over vici, not including keys
@@ -186,13 +216,23 @@ func (s *Session) LoadToken(msg *Message) (*Message, error) {
 }
 
 // LoadShared loads a shared IKE PSK, EAP, XAuth or NTLM secret into the daemon.
-func (s *Session) LoadShared(msg *Message) (*Message, error) {
-	return s.sendRequest("load-shared", msg)
+func (s *Session) LoadShared(msg *Message) error {
+	m, err := s.sendRequest("load-shared", msg)
+	if err != nil {
+		return err
+	}
+
+	return m.CheckSuccess()
 }
 
 // UnloadShared unloads a previously shared IKE PSK, EAP, XAuth or NTLM secret by its unique identifier.
-func (s *Session) UnloadShared(msg *Message) (*Message, error) {
-	return s.sendRequest("unload-shared", msg)
+func (s *Session) UnloadShared(msg *Message) error {
+	m, err := s.sendRequest("unload-shared", msg)
+	if err != nil {
+		return err
+	}
+
+	return m.CheckSuccess()
 }
 
 // GetShared returns a list of unique identifiers of shared keys loaded exclusively over vici, not including
@@ -203,36 +243,66 @@ func (s *Session) GetShared() (*Message, error) {
 
 // FlushCerts flushes the certificate cache. The optional type argument allows to flush only certificates of
 // a given type, e.g. cached CRLs.
-func (s *Session) FlushCerts(msg *Message) (*Message, error) {
-	return s.sendRequest("flush-certs", msg)
+func (s *Session) FlushCerts(msg *Message) error {
+	m, err := s.sendRequest("flush-certs", msg)
+	if err != nil {
+		return err
+	}
+
+	return m.CheckSuccess()
 }
 
 // CleadCreds clears all loaded certificate, private key and shared key credentials. This only affects credentials
 // loaded over vici but additionally flushes the credential cache.
-func (s *Session) ClearCreds() (*Message, error) {
-	return s.sendRequest("clear-creds", nil)
+func (s *Session) ClearCreds() error {
+	m, err := s.sendRequest("clear-creds", nil)
+	if err != nil {
+		return err
+	}
+
+	return m.CheckSuccess()
 }
 
 // LoadAuthority loads a single CA definition into the daemon. An exisiting authority with the same name gets replaced.
-func (s *Session) LoadAuthority(msg *Message) (*Message, error) {
-	return s.sendRequest("load-authority", msg)
+func (s *Session) LoadAuthority(msg *Message) error {
+	m, err := s.sendRequest("load-authority", msg)
+	if err != nil {
+		return err
+	}
+
+	return m.CheckSuccess()
 }
 
 // UnloadAuthority unloads a previously loaded CA definition by name.
-func (s *Session) UnloadAuthority(msg *Message) (*Message, error) {
-	return s.sendRequest("unload-authority", msg)
+func (s *Session) UnloadAuthority(msg *Message) error {
+	m, err := s.sendRequest("unload-authority", msg)
+	if err != nil {
+		return err
+	}
+
+	return m.CheckSuccess()
 }
 
 // LoadPool loads an in-memory virtual IP and configuration attribute pool. Exisiting pools with the same name
 // get updated, if possible.
-func (s *Session) LoadPool(msg *Message) (*Message, error) {
-	return s.sendRequest("load-pool", msg)
+func (s *Session) LoadPool(msg *Message) error {
+	m, err := s.sendRequest("load-pool", msg)
+	if err != nil {
+		return err
+	}
+
+	return m.CheckSuccess()
 }
 
 // UnloadPool unloads a previously loaded virtual IP and configuration attribute pool. Unloading fails for pools
 // with leases currently online.
-func (s *Session) UnloadPool(msg *Message) (*Message, error) {
-	return s.sendRequest("unload-pool", msg)
+func (s *Session) UnloadPool(msg *Message) error {
+	m, err := s.sendRequest("unload-pool", msg)
+	if err != nil {
+		return err
+	}
+
+	return m.CheckSuccess()
 }
 
 // GetPools lists the currently loaded pools.
@@ -251,8 +321,13 @@ func (s *Session) GetCounters(msg *Message) (*Message, error) {
 }
 
 // ResetCounters resets global or connection-specific IKE event counters.
-func (s *Session) ResetCounters(msg *Message) (*Message, error) {
-	return s.sendRequest("reset-counters", msg)
+func (s *Session) ResetCounters(msg *Message) error {
+	m, err := s.sendRequest("reset-counters", msg)
+	if err != nil {
+		return err
+	}
+
+	return m.CheckSuccess()
 }
 
 // Listen listens for registered events.
