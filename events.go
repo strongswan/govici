@@ -66,6 +66,11 @@ const (
 	ChildRekey = "child-rekey"
 )
 
+var (
+	// Event listener channel was closed
+	errChannelClosed = errors.New("vici: event listener channel closed")
+)
+
 type eventError struct{ error }
 
 type eventListener struct {
@@ -84,7 +89,7 @@ func newEventListener(t *transport) *eventListener {
 func (el *eventListener) nextEvent() (*Message, error) {
 	m := <-el.mc
 	if m == nil {
-		return nil, errors.New("message channel closed")
+		return nil, errChannelClosed
 	}
 
 	return m, nil
@@ -158,11 +163,11 @@ func (el *eventListener) eventRegisterUnregister(event string, register bool) er
 	}
 
 	if p.ptype == pktEventUnknown {
-		return fmt.Errorf("unknown event type '%v'", event)
+		return fmt.Errorf("%v: %v", errEventUnknown, event)
 	}
 
 	if p.ptype != pktEventConfirm {
-		return fmt.Errorf("unexpected packet type: expected %v but received %v", pktEventConfirm, p.ptype)
+		return fmt.Errorf("%v:%v", errUnexpectedResponse, p.ptype)
 	}
 
 	return nil
@@ -179,5 +184,5 @@ func (el *eventListener) eventTransportCommunicate(pkt *packet) (*packet, error)
 		return nil, err
 	}
 
-	return p, err
+	return p, nil
 }

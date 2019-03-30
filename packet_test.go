@@ -33,6 +33,7 @@ var (
 		ptype: pktCmdRequest,
 		name:  "install",
 		msg: &Message{
+			keys: []string{"child", "ike"},
 			data: map[string]interface{}{
 				"child": "test-CHILD_SA",
 				"ike":   "test-IKE_SA",
@@ -56,6 +57,7 @@ var (
 	goldUnnamedPacket = &packet{
 		ptype: pktCmdResponse,
 		msg: &Message{
+			keys: []string{"success", "errmsg"},
 			data: map[string]interface{}{
 				"success": "no",
 				"errmsg":  "failed to install CHILD_SA",
