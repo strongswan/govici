@@ -26,6 +26,7 @@ package vici
 import (
 	"bytes"
 	"errors"
+	"fmt"
 )
 
 const (
@@ -52,6 +53,16 @@ const (
 
 	// A named event message
 	pktEvent
+)
+
+var (
+	// Generic packet writing error
+	errPacketWrite = errors.New("vici: error writing packet")
+
+	// Generic packet parsing error
+	errPacketParse = errors.New("vici: error parsing packet")
+
+	errBadName = fmt.Errorf("%v: expected name length does not match actual length", errPacketParse)
 )
 
 // A packet has a required type (an 8-bit identifier), a name (only required for named types),
@@ -96,12 +107,12 @@ func (p *packet) bytes() ([]byte, error) {
 	if p.isNamed() {
 		err := buf.WriteByte(uint8(len(p.name)))
 		if err != nil {
-			return []byte{}, err
+			return []byte{}, fmt.Errorf("%v: %v", errPacketWrite, err)
 		}
 
 		_, err = buf.WriteString(p.name)
 		if err != nil {
-			return []byte{}, err
+			return []byte{}, fmt.Errorf("%v: %v", errPacketWrite, err)
 		}
 	}
 
@@ -113,7 +124,7 @@ func (p *packet) bytes() ([]byte, error) {
 
 		_, err = buf.Write(b)
 		if err != nil {
-			return []byte{}, err
+			return []byte{}, fmt.Errorf("%v: %v", errPacketWrite, err)
 		}
 	}
 
@@ -127,7 +138,7 @@ func (p *packet) parse(data []byte) error {
 	// Read the packet type
 	b, err := buf.ReadByte()
 	if err != nil {
-		return err
+		return fmt.Errorf("%v: %v", errPacketParse, err)
 	}
 	p.ptype = b
 
@@ -135,13 +146,13 @@ func (p *packet) parse(data []byte) error {
 		// Get the length of the name
 		l, err := buf.ReadByte()
 		if err != nil {
-			return nil
+			return fmt.Errorf("%v: %v", errPacketParse, err)
 		}
 
 		// Read the name
 		name := buf.Next(int(l))
 		if len(name) != int(l) {
-			return errors.New("expected name length does not match actual length")
+			return errBadName
 		}
 		p.name = string(name)
 	}

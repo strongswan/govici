@@ -25,8 +25,13 @@ package vici
 
 import (
 	"errors"
+	"fmt"
 	"strconv"
 	"sync"
+)
+
+var (
+	errExpectedKey = errors.New("vici: expected message to contain key")
 )
 
 // Session is a vici client session
@@ -103,8 +108,7 @@ func (s *Session) Rekey(msg *Message) (int, error) {
 
 	n := m.Get("matches")
 	if n == nil {
-		// XXX: Standard error
-		return -1, errors.New("expected non-nil value for key 'matches'")
+		return -1, fmt.Errorf("%v: matches", errExpectedKey)
 	}
 
 	return strconv.Atoi(n.(string))
@@ -121,8 +125,7 @@ func (s *Session) Redirect(msg *Message) (int, error) {
 
 	n := m.Get("matches")
 	if n == nil {
-		// XXX: Standard error
-		return -1, errors.New("expected non-nil value for key 'matches'")
+		return -1, fmt.Errorf("%v: matches", errExpectedKey)
 	}
 
 	return strconv.Atoi(n.(string))
@@ -172,8 +175,7 @@ func (s *Session) GetConns() ([]string, error) {
 
 	conns := m.Get("conns")
 	if conns == nil {
-		// XXX: Standard error
-		return []string{}, errors.New("got nil value")
+		return []string{}, fmt.Errorf("%v: conns", errExpectedKey)
 	}
 
 	return conns.([]string), nil
@@ -200,8 +202,7 @@ func (s *Session) GetAuthorities() ([]string, error) {
 
 	authorities := m.Get("authorities")
 	if authorities == nil {
-		// XXX: Standard error
-		return []string{}, errors.New("got nil value")
+		return []string{}, fmt.Errorf("%v: authorities", errExpectedKey)
 	}
 
 	return authorities.([]string), nil
@@ -248,8 +249,7 @@ func (s *Session) LoadKey(msg *Message) (string, error) {
 
 	id := m.Get("id")
 	if id == nil {
-		// XXX: Standard error
-		return "", errors.New("got nil value")
+		return "", fmt.Errorf("%v: id", errExpectedKey)
 	}
 
 	return id.(string), nil
@@ -275,8 +275,7 @@ func (s *Session) GetKeys() ([]string, error) {
 
 	keys := m.Get("keys")
 	if keys == nil {
-		// XXX: Standard error
-		return []string{}, errors.New("got nil value")
+		return []string{}, fmt.Errorf("%v: keys", errExpectedKey)
 	}
 
 	return keys.([]string), nil
@@ -293,8 +292,7 @@ func (s *Session) LoadToken(msg *Message) (string, error) {
 
 	id := m.Get("id")
 	if id == nil {
-		// XXX: Standard error
-		return "", errors.New("got nil value")
+		return "", fmt.Errorf("%v: id", errExpectedKey)
 	}
 
 	return id.(string), nil
@@ -330,8 +328,7 @@ func (s *Session) GetShared() ([]string, error) {
 
 	shared := m.Get("keys")
 	if shared == nil {
-		// XXX: Standard error
-		return []string{}, errors.New("got nil value")
+		return []string{}, fmt.Errorf("%v: keys", errExpectedKey)
 	}
 
 	return shared.([]string), nil

@@ -52,6 +52,27 @@ const (
 	msgListEnd
 )
 
+var (
+	// Generic errors to wrap other errors from outside of vici
+	errEncoding = errors.New("vici: error encoding message")
+	errDecoding = errors.New("vici: error decoding message")
+
+	// Encountered unsupported type when encoding a message
+	errUnsupportedType = errors.New("vici: unsupported message element type")
+
+	// Used in CheckSuccess - the 'success' field was set to "no"
+	errCommandFailed = errors.New("vici: command failed")
+
+	// Base message for decoding errors that are due to an incorrectly formatted message
+	errMalformedMessage = errors.New("vici: malformed message")
+
+	// Malformed message errors
+	errEndOfBuffer       = fmt.Errorf("%v: unexpected end of buffer", errMalformedMessage)
+	errBadKey            = fmt.Errorf("%v: expected key length does not match actual length", errMalformedMessage)
+	errBadValue          = fmt.Errorf("%v: expected value length does not match actual length", errMalformedMessage)
+	errExpectedBeginning = fmt.Errorf("%v: expected beginning of message element", errMalformedMessage)
+)
+
 // MessageStream is used to feed continuous data during a command request.
 type MessageStream struct {
 	// Message list
@@ -71,6 +92,7 @@ type Message struct {
 
 func NewMessage() *Message {
 	return &Message{
+		keys: make([]string, 0),
 		data: make(map[string]interface{}),
 	}
 }
@@ -99,19 +121,19 @@ func (m *Message) addItem(key string, value interface{}) error {
 	case reflect.Slice, reflect.Array:
 		list, ok := value.([]string)
 		if !ok {
-			return fmt.Errorf("unsupported type: %v", rv.Kind())
+			return errUnsupportedType
 		}
 		m.data[key] = list
 
 	case reflect.Ptr:
 		msg, ok := value.(*Message)
 		if !ok {
-			return fmt.Errorf("unsupported type: %v", rv.Kind())
+			return errUnsupportedType
 		}
 		m.data[key] = msg
 
 	default:
-		return fmt.Errorf("unsupported type: %v", rv.Kind())
+		return errUnsupportedType
 	}
 
 	m.keys = append(m.keys, key)
@@ -144,7 +166,7 @@ func (m *Message) CheckSuccess() error {
 	// return an error using that message.
 	if success, ok := m.data["success"]; ok {
 		if success != "yes" {
-			return fmt.Errorf("command failed: %v", m.data["errmsg"])
+			return fmt.Errorf("%v: %v", errCommandFailed, m.data["errmsg"])
 		}
 	}
 
@@ -186,7 +208,7 @@ func (m *Message) encode() ([]byte, error) {
 		case reflect.Ptr:
 			uv, ok := v.(*Message)
 			if !ok {
-				return []byte{}, errors.New("unsupported data type")
+				return []byte{}, errUnsupportedType
 			}
 
 			data, err = m.encodeSection(k, uv)
@@ -195,12 +217,12 @@ func (m *Message) encode() ([]byte, error) {
 			}
 
 		default:
-			return []byte{}, errors.New("unsupported data type")
+			return []byte{}, errUnsupportedType
 		}
 
 		_, err = buf.Write(data)
 		if err != nil {
-			return []byte{}, err
+			return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
 		}
 	}
 
@@ -212,7 +234,7 @@ func (m *Message) decode(data []byte) error {
 
 	b, err := buf.ReadByte()
 	if err != nil && err != io.EOF {
-		return err
+		return fmt.Errorf("%v: %v", errDecoding, err)
 	}
 
 	for buf.Len() > 0 {
@@ -243,7 +265,7 @@ func (m *Message) decode(data []byte) error {
 
 		b, err = buf.ReadByte()
 		if err != nil && err != io.EOF {
-			return err
+			return fmt.Errorf("%v: %v", errDecoding, err)
 		}
 	}
 
@@ -263,12 +285,12 @@ func (m *Message) encodeKeyValue(key, value string) ([]byte, error) {
 	// Write the key length and key
 	err := buf.WriteByte(uint8(len(key)))
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	_, err = buf.WriteString(key)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	// Write the value's length to the buffer as two bytes
@@ -277,13 +299,13 @@ func (m *Message) encodeKeyValue(key, value string) ([]byte, error) {
 
 	_, err = buf.Write(vl)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	// Write the value to the buffer
 	_, err = buf.WriteString(value)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	return buf.Bytes(), nil
@@ -303,19 +325,19 @@ func (m *Message) encodeList(key string, list []string) ([]byte, error) {
 	// Write the key length and key
 	err := buf.WriteByte(uint8(len(key)))
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	_, err = buf.WriteString(key)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	for _, item := range list {
 		// Indicate that this is a list item
 		err = buf.WriteByte(msgListItem)
 		if err != nil {
-			return []byte{}, err
+			return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
 		}
 
 		// Write the item's length to the buffer as two bytes
@@ -324,20 +346,20 @@ func (m *Message) encodeList(key string, list []string) ([]byte, error) {
 
 		_, err = buf.Write(il)
 		if err != nil {
-			return []byte{}, err
+			return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
 		}
 
 		// Write the item to the buffer
 		_, err = buf.WriteString(item)
 		if err != nil {
-			return []byte{}, err
+			return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
 		}
 	}
 
 	// Indicate the end of the list
 	err = buf.WriteByte(msgListEnd)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	return buf.Bytes(), nil
@@ -352,12 +374,12 @@ func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
 	// Write the key length and key
 	err := buf.WriteByte(uint8(len(key)))
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	_, err = buf.WriteString(key)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	// Encode the sections elements
@@ -390,7 +412,7 @@ func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
 		case reflect.Ptr:
 			uv, ok := v.(*Message)
 			if !ok {
-				return []byte{}, errors.New("unsupported data type")
+				return []byte{}, errUnsupportedType
 			}
 
 			data, err = m.encodeSection(k, uv)
@@ -399,12 +421,12 @@ func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
 			}
 
 		default:
-			return []byte{}, errors.New("unsupported data type")
+			return []byte{}, errUnsupportedType
 		}
 
 		_, err = buf.Write(data)
 		if err != nil {
-			return []byte{}, err
+			return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
 		}
 
 	}
@@ -412,7 +434,7 @@ func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
 	// Indicate the end of the section
 	err = buf.WriteByte(msgSectionEnd)
 	if err != nil {
-		return []byte{}, err
+		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	return buf.Bytes(), nil
@@ -426,19 +448,19 @@ func (m *Message) decodeKeyValue(data []byte) (int, error) {
 	// Read the key from the buffer
 	n, err := buf.ReadByte()
 	if err != nil {
-		return -1, err
+		return -1, fmt.Errorf("%v: %v", errDecoding, err)
 	}
 
 	keyLen := int(n)
 	key := string(buf.Next(keyLen))
 	if len(key) != keyLen {
-		return -1, errors.New("expected key length does not match actual length")
+		return -1, errBadKey
 	}
 
 	// Read the value's length
 	v := buf.Next(2)
 	if len(v) != 2 {
-		return -1, errors.New("unexpected end of buffer")
+		return -1, errEndOfBuffer
 
 	}
 
@@ -446,12 +468,12 @@ func (m *Message) decodeKeyValue(data []byte) (int, error) {
 	valueLen := int(binary.BigEndian.Uint16(v))
 	value := string(buf.Next(valueLen))
 	if len(value) != valueLen {
-		return -1, errors.New("expected value length does not match actual length")
+		return -1, errBadValue
 	}
 
 	err = m.addItem(key, value)
 	if err != nil {
-		return -1, err
+		return -1, fmt.Errorf("%v: %v", errDecoding, err)
 	}
 
 	// Return the length of the key and value, plus the three bytes for their
@@ -469,18 +491,18 @@ func (m *Message) decodeList(data []byte) (int, error) {
 	// Read the key from the buffer
 	n, err := buf.ReadByte()
 	if err != nil {
-		return -1, err
+		return -1, fmt.Errorf("%v: %v", errDecoding, err)
 	}
 
 	keyLen := int(n)
 	key := string(buf.Next(keyLen))
 	if len(key) != keyLen {
-		return -1, errors.New("expected key length does not match actual length")
+		return -1, errBadKey
 	}
 
 	b, err := buf.ReadByte()
 	if err != nil {
-		return -1, err
+		return -1, fmt.Errorf("%v: %v", errDecoding, err)
 	}
 
 	// Keep track of bytes decoded
@@ -490,13 +512,13 @@ func (m *Message) decodeList(data []byte) (int, error) {
 	for b != msgListEnd {
 		// Ensure this is the beginning of a list item
 		if b != msgListItem {
-			return -1, errors.New("expected beginning of list item")
+			return -1, errExpectedBeginning
 		}
 
 		// Read the value's length
 		v := buf.Next(2)
 		if len(v) != 2 {
-			return -1, errors.New("unexpected end of buffer")
+			return -1, errEndOfBuffer
 
 		}
 
@@ -504,14 +526,14 @@ func (m *Message) decodeList(data []byte) (int, error) {
 		valueLen := int(binary.BigEndian.Uint16(v))
 		value := string(buf.Next(valueLen))
 		if len(value) != valueLen {
-			return -1, errors.New("expected value length does not match actual length")
+			return -1, errBadValue
 		}
 
 		list = append(list, value)
 
 		b, err = buf.ReadByte()
 		if err != nil {
-			return -1, err
+			return -1, fmt.Errorf("%v: %v", errDecoding, err)
 		}
 
 		count += valueLen + 3
@@ -519,7 +541,7 @@ func (m *Message) decodeList(data []byte) (int, error) {
 
 	err = m.addItem(key, list)
 	if err != nil {
-		return -1, err
+		return -1, fmt.Errorf("%v: %v", errDecoding, err)
 	}
 
 	return count, nil
@@ -535,18 +557,18 @@ func (m *Message) decodeSection(data []byte) (int, error) {
 	// Read the key from the buffer
 	n, err := buf.ReadByte()
 	if err != nil {
-		return -1, err
+		return -1, fmt.Errorf("%v: %v", errDecoding, err)
 	}
 
 	keyLen := int(n)
 	key := string(buf.Next(keyLen))
 	if len(key) != keyLen {
-		return -1, errors.New("expected key length does not match actual length")
+		return -1, errBadKey
 	}
 
 	b, err := buf.ReadByte()
 	if err != nil {
-		return -1, err
+		return -1, fmt.Errorf("%v: %v", errDecoding, err)
 	}
 
 	// Keep track of bytes decoded
@@ -587,12 +609,12 @@ func (m *Message) decodeSection(data []byte) (int, error) {
 			count += n
 
 		default:
-			return -1, errors.New("expected key-value pair or the beginning of a section or list")
+			return -1, errExpectedBeginning
 		}
 
 		b, err = buf.ReadByte()
 		if err != nil {
-			return -1, err
+			return -1, fmt.Errorf("%v: %v", errDecoding, err)
 		}
 
 		count++

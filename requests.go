@@ -24,7 +24,16 @@
 package vici
 
 import (
+	"errors"
 	"fmt"
+)
+
+var (
+	// Received unexpected response from server
+	errUnexpectedResponse = errors.New("vici: unexpected response type")
+
+	// Received EVENT_UNKNOWN from server
+	errEventUnknown = errors.New("vici: unknown event type")
 )
 
 func (s *Session) sendRequest(cmd string, msg *Message) (*Message, error) {
@@ -37,10 +46,10 @@ func (s *Session) sendRequest(cmd string, msg *Message) (*Message, error) {
 	}
 
 	if p.ptype != pktCmdResponse {
-		return nil, fmt.Errorf("unexpected response type: %v", p.ptype)
+		return nil, fmt.Errorf("%v: %v", errUnexpectedResponse, p.ptype)
 	}
 
-	if p.msg.CheckSuccess() != nil {
+	if err := p.msg.CheckSuccess(); err != nil {
 		return nil, err
 	}
 
@@ -87,8 +96,7 @@ func (s *Session) handleStreamedRequest(cmd, event string, msg *Message) (*Messa
 
 	// Packet type was not event, check if it was command response
 	if p.ptype != pktCmdResponse {
-		err := fmt.Errorf("unexpected packet type in message stream: %v", p.ptype)
-		return nil, err
+		return nil, fmt.Errorf("%v: %v", errUnexpectedResponse, p.ptype)
 	}
 	messages = append(messages, p.msg)
 
@@ -109,11 +117,11 @@ func (s *Session) streamEventRegisterUnregister(event string, register bool) err
 	}
 
 	if p.ptype == pktEventUnknown {
-		return fmt.Errorf("unknown event type '%v'", event)
+		return fmt.Errorf("%v: %v", errEventUnknown, event)
 	}
 
 	if p.ptype != pktEventConfirm {
-		return fmt.Errorf("unexpected packet type: expected %v but received %v", pktEventConfirm, p.ptype)
+		return fmt.Errorf("%v: %v", errUnexpectedResponse, p.ptype)
 	}
 
 	return nil
@@ -133,5 +141,5 @@ func (s *Session) cmdTransportCommunicate(pkt *packet) (*packet, error) {
 		return nil, err
 	}
 
-	return p, err
+	return p, nil
 }

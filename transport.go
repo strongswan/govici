@@ -26,6 +26,8 @@ package vici
 import (
 	"bytes"
 	"encoding/binary"
+	"errors"
+	"fmt"
 	"net"
 )
 
@@ -40,6 +42,11 @@ const (
 	maxSegment = 512 * 1024
 )
 
+var (
+	// Generic transport error
+	errTransport = errors.New("vici: transport error")
+)
+
 func newTransport(c net.Conn) (*transport, error) {
 	if c != nil {
 		return &transport{c}, nil
@@ -47,7 +54,7 @@ func newTransport(c net.Conn) (*transport, error) {
 
 	c, err := net.Dial("unix", viciSocket)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%v: %v", errTransport, err)
 	}
 
 	return &transport{c}, nil
@@ -70,18 +77,21 @@ func (t *transport) send(pkt *packet) error {
 	binary.BigEndian.PutUint32(pl, uint32(len(b)))
 	_, err = buf.Write(pl)
 	if err != nil {
-		return err
+		return fmt.Errorf("%v: %v", errTransport, err)
 	}
 
 	// Write the payload
 	_, err = buf.Write(b)
 	if err != nil {
-		return err
+		return fmt.Errorf("%v: %v", errTransport, err)
 	}
 
 	_, err = t.conn.Write(buf.Bytes())
+	if err != nil {
+		return fmt.Errorf("%v: %v", errTransport, err)
+	}
 
-	return err
+	return nil
 }
 
 func (t *transport) recv() (*packet, error) {
@@ -89,14 +99,14 @@ func (t *transport) recv() (*packet, error) {
 
 	_, err := t.conn.Read(buf)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%v: %v", errTransport, err)
 	}
 	pl := binary.BigEndian.Uint32(buf)
 
 	buf = make([]byte, int(pl))
 	_, err = t.conn.Read(buf)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("%v: %v", errTransport, err)
 	}
 
 	p := &packet{}
