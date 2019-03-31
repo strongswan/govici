@@ -123,8 +123,10 @@ type testMessage struct {
 	Message  *Message     `vici:"message"`
 	Section1 testSection  `vici:"section1"`
 	Section2 *testSection `vici:"section2"`
+	Skip     string       `vici:"-"`
 
-	Hidden bool
+	NotTagged  string
+	unexported string
 }
 
 type testSection struct {
@@ -163,5 +165,20 @@ func TestMarshalMessage(t *testing.T) {
 
 	if !reflect.DeepEqual(m, goldMarshaled) {
 		t.Errorf("Marshaled message does not equal gold marshaled message.\nExpected: %v\nReceived: %v", goldMarshaled, m)
+	}
+}
+
+func TestUnmarshalMessage(t *testing.T) {
+	tm := &testMessage{
+		Message:  NewMessage(),
+		Section2: &testSection{},
+	}
+	err := UnmarshalMessage(goldMarshaled, tm)
+	if err != nil {
+		t.Errorf("Unexpected error unmarshaling: %v", err)
+	}
+
+	if !reflect.DeepEqual(*tm, goldUnmarshaled) {
+		t.Errorf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", goldUnmarshaled, *tm)
 	}
 }
