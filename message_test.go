@@ -75,7 +75,62 @@ var (
 		// section1 end
 		2,
 	}
+
+	goldUnmarshaled = testMessage{
+		Key:  "value",
+		List: []string{"item1", "item2"},
+		Message: &Message{
+			keys: []string{"key1"},
+			data: map[string]interface{}{
+				"key1": "value1",
+			},
+		},
+		Section1: testSection{Key: "key2"},
+		Section2: &testSection{List: []string{"item3", "item4"}},
+	}
+
+	goldMarshaled = &Message{
+		keys: []string{"key", "list", "message", "section1", "section2"},
+		data: map[string]interface{}{
+			"key":  "value",
+			"list": []string{"item1", "item2"},
+			"message": &Message{
+				keys: []string{"key1"},
+				data: map[string]interface{}{
+					"key1": "value1",
+				},
+			},
+			"section1": &Message{
+				keys: []string{"key"},
+				data: map[string]interface{}{
+					"key": "key2",
+				},
+			},
+			"section2": &Message{
+				keys: []string{"list"},
+				data: map[string]interface{}{
+					"list": []string{"item3", "item4"},
+				},
+			},
+		},
+	}
 )
+
+type testMessage struct {
+	Key      string       `vici:"key"`
+	Empty    string       `vici:"empty,omitempty"`
+	List     []string     `vici:"list"`
+	Message  *Message     `vici:"message"`
+	Section1 testSection  `vici:"section1"`
+	Section2 *testSection `vici:"section2"`
+
+	Hidden bool
+}
+
+type testSection struct {
+	Key  string   `vici:"key,omitempty"`
+	List []string `vici:"list,omitempty"`
+}
 
 func TestMessageEncode(t *testing.T) {
 	b, err := goldMessage.encode()
@@ -97,5 +152,16 @@ func TestMessageDecode(t *testing.T) {
 
 	if !reflect.DeepEqual(m.data, goldMessage.data) {
 		t.Errorf("Decoded message does not equal gold message.\nExpected: %v\nReceived: %v", goldMessage.data, m.data)
+	}
+}
+
+func TestMarshalMessage(t *testing.T) {
+	m, err := MarshalMessage(goldUnmarshaled)
+	if err != nil {
+		t.Errorf("Unexpected error marshaling: %v", err)
+	}
+
+	if !reflect.DeepEqual(m, goldMarshaled) {
+		t.Errorf("Marshaled message does not equal gold marshaled message.\nExpected: %v\nReceived: %v", goldMarshaled, m)
 	}
 }

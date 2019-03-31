@@ -30,6 +30,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strings"
 )
 
 const (
@@ -67,10 +68,13 @@ var (
 	errMalformedMessage = errors.New("vici: malformed message")
 
 	// Malformed message errors
-	errEndOfBuffer       = fmt.Errorf("%v: unexpected end of buffer", errMalformedMessage)
 	errBadKey            = fmt.Errorf("%v: expected key length does not match actual length", errMalformedMessage)
 	errBadValue          = fmt.Errorf("%v: expected value length does not match actual length", errMalformedMessage)
+	errEndOfBuffer       = fmt.Errorf("%v: unexpected end of buffer", errMalformedMessage)
 	errExpectedBeginning = fmt.Errorf("%v: expected beginning of message element", errMalformedMessage)
+
+	// Unsupported type during message marshaling
+	errMarshalUnsupportedType = errors.New("vici: encountered unsupported type marshaling message")
 )
 
 // MessageStream is used to feed continuous data during a command request.
@@ -95,6 +99,15 @@ func NewMessage() *Message {
 		keys: make([]string, 0),
 		data: make(map[string]interface{}),
 	}
+}
+
+func MarshalMessage(v interface{}) (*Message, error) {
+	m := NewMessage()
+	if err := m.marshal(v); err != nil {
+		return nil, err
+	}
+
+	return m, nil
 }
 
 func (m *Message) Set(key string, value interface{}) error {
@@ -626,4 +639,119 @@ func (m *Message) decodeSection(data []byte) (int, error) {
 	}
 
 	return count, nil
+}
+
+// messageTag is used for parsing struct tags in marshaling Messages
+type messageTag struct {
+	name string
+
+	skip      bool
+	omitempty bool
+}
+
+func getMessageTag(tag reflect.StructTag) messageTag {
+	t := tag.Get("vici")
+	if t == "-" || t == "" {
+		return messageTag{skip: true}
+	}
+
+	var mt messageTag
+
+	parts := strings.Split(t, ",")
+	mt.name = parts[0]
+
+	for _, p := range parts[1:] {
+		if p == "omitempty" {
+			mt.omitempty = true
+		}
+	}
+
+	return mt
+}
+
+func emptyMessageElement(rv reflect.Value) bool {
+	switch rv.Kind() {
+
+	case reflect.Slice:
+		return rv.IsNil()
+
+	case reflect.Struct:
+		z := true
+		for i := 0; i < rv.NumField(); i++ {
+			z = z && emptyMessageElement(rv.Field(i))
+		}
+		return z
+	}
+
+	return rv.Interface() == reflect.Zero(rv.Type()).Interface()
+}
+
+func (m *Message) marshal(v interface{}) error {
+	rv := reflect.ValueOf(v)
+
+	// v must either be a struct or a pointer to one
+	if rv.Kind() == reflect.Ptr {
+		rv = reflect.Indirect(rv)
+	}
+
+	if rv.Kind() != reflect.Struct {
+		return fmt.Errorf("%v: %v", errMarshalUnsupportedType, rv.Kind())
+	}
+
+	rt := rv.Type()
+	for i := 0; i < rt.NumField(); i++ {
+		rf := rt.Field(i)
+
+		mt := getMessageTag(rf.Tag)
+		if mt.skip {
+			continue
+		}
+
+		rfv := rv.Field(i)
+
+		if mt.omitempty && emptyMessageElement(rfv) {
+			continue
+		}
+
+		// Add the message element
+		err := m.marshalField(mt.name, rfv)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func (m *Message) marshalField(name string, rv reflect.Value) error {
+	switch rv.Kind() {
+
+	case reflect.String, reflect.Slice, reflect.Array:
+		return m.addItem(name, rv.Interface())
+
+	case reflect.Ptr:
+		if _, ok := rv.Interface().(*Message); ok {
+			return m.addItem(name, rv.Interface())
+		}
+
+		msg := NewMessage()
+		if err := msg.marshal(rv.Interface()); err != nil {
+			return err
+		}
+
+		return m.addItem(name, msg)
+
+	case reflect.Struct:
+		msg := NewMessage()
+		if err := msg.marshal(rv.Interface()); err != nil {
+			return err
+		}
+
+		return m.addItem(name, msg)
+
+	default:
+		return fmt.Errorf("%v: %v", errMarshalUnsupportedType, rv.Kind())
+	}
+
+	return nil
 }
