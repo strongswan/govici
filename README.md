@@ -1,3 +1,5 @@
+# go-vici
+
 ## About
 
 The strongSwan [vici protocol](https://www.strongswan.org/apidoc/md_src_libcharon_plugins_vici_README.html) is used for external applications to monitor, configure, and control the IKE daemon charon. This go package provides a pure-go implementation of a vici client.
@@ -5,22 +7,32 @@ The strongSwan [vici protocol](https://www.strongswan.org/apidoc/md_src_libcharo
 ## Getting started
 `go get -u github.com/enr0n/vici`
 
-## Example
+## Usage
 
 ```go
 package main
 
 import (
-    "fmt"
+	"fmt"
 
-    "github.com/enr0n/vici"
+	"github.com/enr0n/vici"
 )
 
 func main() {
-    session := vici.NewSession()
+	session, err := vici.NewSession()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
-    fmt.Printf("Version: %v\n", session.Version())
+	m, err := session.Version()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Printf("%v %v\n", m.Get("daemon"), m.Get("version"))
 }
 ```
 
-For a complete list of examples, look in the `examples` subdirectory.
+For a complete list of examples, look in the `_examples` directory.

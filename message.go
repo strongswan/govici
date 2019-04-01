@@ -1,4 +1,3 @@
-//
 // Copyright (C) 2019 Nick Rosbrook
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -18,9 +17,7 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-//
 
-// Package vici implements a strongSwan vici protocol client
 package vici
 
 import (
@@ -84,7 +81,8 @@ var (
 	errUnmarshalNonMessage   = fmt.Errorf("%v: encountered non-message type", errUnmarshal)
 )
 
-// MessageStream is used to feed continuous data during a command request.
+// MessageStream is used to feed continuous data during a command request, and simply
+// contains a slice of *Message.
 type MessageStream struct {
 	// Message list
 	messages []*Message
@@ -96,6 +94,11 @@ func (ms *MessageStream) Messages() []*Message {
 }
 
 // Message represents a vici message.
+//
+// A Message ensures that elements are encoded in the order they are
+// added to the message, through the usage of Set. Valid message elements
+// are key-value pairs, lists, and sections which correspond to the Go types
+// string, []string, and *Message respectively.
 type Message struct {
 	keys []string
 
@@ -136,7 +139,8 @@ func (m *Message) Set(key string, value interface{}) error {
 	return m.addItem(key, value)
 }
 
-// Get returns the message fiel identified by key, if it exists.
+// Get returns the message field identified by key, if it exists. If the
+// field does not exist, nil is returned.
 func (m *Message) Get(key string) interface{} {
 	v, ok := m.data[key]
 	if !ok {
@@ -144,6 +148,11 @@ func (m *Message) Get(key string) interface{} {
 	}
 
 	return v
+}
+
+// Keys returns the list of valid message keys.
+func (m *Message) Keys() []string {
+	return m.keys
 }
 
 // CheckSuccess examines a command response Message, and determines if it was successful.
