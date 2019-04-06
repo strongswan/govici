@@ -115,7 +115,7 @@ var (
 
 type testMessage struct {
 	Key      string       `vici:"key"`
-	Empty    string       `vici:"empty,omitempty"`
+	Empty    string       `vici:"empty"`
 	List     []string     `vici:"list"`
 	Message  *Message     `vici:"message"`
 	Section1 testSection  `vici:"section1"`
@@ -127,8 +127,8 @@ type testMessage struct {
 }
 
 type testSection struct {
-	Key  string   `vici:"key,omitempty"`
-	List []string `vici:"list,omitempty"`
+	Key  string   `vici:"key"`
+	List []string `vici:"list"`
 }
 
 func TestMessageEncode(t *testing.T) {
