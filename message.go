@@ -27,7 +27,6 @@ import (
 	"fmt"
 	"io"
 	"reflect"
-	"strings"
 )
 
 const (
@@ -678,8 +677,7 @@ func (m *Message) decodeSection(data []byte) (int, error) {
 type messageTag struct {
 	name string
 
-	skip      bool
-	omitempty bool
+	skip bool
 }
 
 func newMessageTag(tag reflect.StructTag) messageTag {
@@ -688,18 +686,7 @@ func newMessageTag(tag reflect.StructTag) messageTag {
 		return messageTag{skip: true}
 	}
 
-	var mt messageTag
-
-	parts := strings.Split(t, ",")
-	mt.name = parts[0]
-
-	for _, p := range parts[1:] {
-		if p == "omitempty" {
-			mt.omitempty = true
-		}
-	}
-
-	return mt
+	return messageTag{name: t}
 }
 
 func emptyMessageElement(rv reflect.Value) bool {
@@ -745,7 +732,7 @@ func (m *Message) marshal(v interface{}) error {
 			continue
 		}
 
-		if mt.omitempty && emptyMessageElement(rfv) {
+		if emptyMessageElement(rfv) {
 			continue
 		}
 

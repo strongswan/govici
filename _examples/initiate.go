@@ -7,11 +7,11 @@ import (
 )
 
 type initiateOptions struct {
-	child      string `vici:"child,omitempty"`
-	ike        string `vici:"ike,omitempty"`
-	timeout    string `vici:"timeout,omitempty"`
-	initLimits string `vici:"init-limits,omitempty"`
-	logLevel   string `vici:"loglevel,omitempty"`
+	child      string `vici:"child"`
+	ike        string `vici:"ike"`
+	timeout    string `vici:"timeout"`
+	initLimits string `vici:"init-limits"`
+	logLevel   string `vici:"loglevel"`
 }
 
 func main() {
