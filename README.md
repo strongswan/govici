@@ -1,6 +1,7 @@
 # go-vici
 
 [![GoDoc](https://godoc.org/github.com/enr0n/vici?status.svg)](https://godoc.org/github.com/enr0n/vici)
+[![Go Report Card](https://goreportcard.com/badge/github.com/enr0n/vici)](https://goreportcard.com/report/github.com/enr0n/vici)
 
 ## About
 
