@@ -1,4 +1,3 @@
-//
 // Copyright (C) 2019 Nick Rosbrook
 //
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -18,9 +17,10 @@
 // LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
-//
 
-// Package vici implements a strongSwan vici protocol client
+// Package vici implements a strongSwan vici protocol client. The go package is
+// documented here. For a complete overview and specification of the vici protocol
+// visit https://www.strongswan.org/apidoc/md_src_libcharon_plugins_vici_README.html.
 package vici
 
 import (
@@ -34,7 +34,7 @@ var (
 	errExpectedKey = errors.New("vici: expected message to contain key")
 )
 
-// Session is a vici client session
+// Session is a vici client session.
 type Session struct {
 	// Only one command can be active on the transport at a time,
 	// but events may get raised at any time while registered, even
@@ -423,13 +423,16 @@ func (s *Session) ResetCounters(msg *Message) error {
 	return m.CheckSuccess()
 }
 
-// Listen listens for registered events.
+// Listen registers the session to listen for all events given. Listen does not return
+// unless the event channel is closed. To receive events that are registered here, use
+// NextEvent.
 func (s *Session) Listen(events []string) error {
 	return s.el.safeListen(events)
 }
 
-// NextEvent returns the next event seen by Listen. NextEvent is a blocking call - if there
-// is no event in the event buffer, NextEvent will wait until there is.
+// NextEvent returns the next event received by the session event listener.  NextEvent is a
+// blocking call. If there is no event in the event buffer, NextEvent will wait to return until
+// a new event is received.
 func (s *Session) NextEvent() (*Message, error) {
 	return s.el.nextEvent()
 }
