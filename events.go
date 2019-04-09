@@ -26,40 +26,40 @@ import (
 )
 
 const (
-	// The Log event is issued to registered clients for each debug
+	// Log event is issued to registered clients for each debug
 	// log message. This event is not associated with a command.
 	Log = "log"
 
-	// The ControlLog event is issued for log events during active initiate
+	// ControlLog event is issued for log events during active initiate
 	// or terminate commands. It is issued only to clients currently having such a command active.
 	ControlLog = "control-log"
 
-	// The ListSA event is issued to stream IKE_SAs during an active list-sas command.
+	// ListSA event is issued to stream IKE_SAs during an active list-sas command.
 	ListSA = "list-sa"
 
-	// The ListPolicy event is issued to stream installed policies during an active list-policies command.
+	// ListPolicy event is issued to stream installed policies during an active list-policies command.
 	ListPolicy = "list-policy"
 
-	// The ListConn event is issued to stream loaded connection during an active list-conns command.
+	// ListConn event is issued to stream loaded connection during an active list-conns command.
 	ListConn = "list-conn"
 
-	// The ListCert event is issued to stream loaded certificates during an active list-certs command.
+	// ListCert event is issued to stream loaded certificates during an active list-certs command.
 	ListCert = "list-cert"
 
-	// The ListAuthority event is issued to stream loaded certification authority information
+	// ListAuthority event is issued to stream loaded certification authority information
 	// during an active_list-authorities_ command.
 	ListAuthority = "list-authority"
 
-	// The IKEUpdown event is issued when an IKE_SA is established or terminated.
+	// IKEUpdown event is issued when an IKE_SA is established or terminated.
 	IKEUpdown = "ike-updown"
 
-	// The IKERekey event is issued when an IKE_SA is rekeyed.
+	// IKERekey event is issued when an IKE_SA is rekeyed.
 	IKERekey = "ike-rekey"
 
-	// The ChildUpdown event is issued when a CHILD_SA is established or terminated.
+	// ChildUpdown event is issued when a CHILD_SA is established or terminated.
 	ChildUpdown = "child-updown"
 
-	// The ChildRekey event is issued when a CHILD_SA is rekeyed.
+	// ChildRekey event is issued when a CHILD_SA is rekeyed.
 	ChildRekey = "child-rekey"
 )
 
@@ -132,7 +132,7 @@ func (el *eventListener) registerEvents(events []string) error {
 	for i, e := range events {
 		err := el.eventRegisterUnregister(e, true)
 		if err != nil {
-			el.unregisterEvents(events[:i-1])
+			el.unregisterEvents(events[:i])
 
 			return err
 		}
