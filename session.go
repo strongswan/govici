@@ -345,7 +345,7 @@ func (s *Session) FlushCerts(msg *Message) error {
 	return m.CheckSuccess()
 }
 
-// CleadCreds clears all loaded certificate, private key and shared key credentials. This only affects credentials
+// ClearCreds clears all loaded certificate, private key and shared key credentials. This only affects credentials
 // loaded over vici but additionally flushes the credential cache.
 func (s *Session) ClearCreds() error {
 	m, err := s.sendRequest("clear-creds", nil)
