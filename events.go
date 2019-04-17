@@ -25,44 +25,6 @@ import (
 	"fmt"
 )
 
-const (
-	// Log event is issued to registered clients for each debug
-	// log message. This event is not associated with a command.
-	Log = "log"
-
-	// ControlLog event is issued for log events during active initiate
-	// or terminate commands. It is issued only to clients currently having such a command active.
-	ControlLog = "control-log"
-
-	// ListSA event is issued to stream IKE_SAs during an active list-sas command.
-	ListSA = "list-sa"
-
-	// ListPolicy event is issued to stream installed policies during an active list-policies command.
-	ListPolicy = "list-policy"
-
-	// ListConn event is issued to stream loaded connection during an active list-conns command.
-	ListConn = "list-conn"
-
-	// ListCert event is issued to stream loaded certificates during an active list-certs command.
-	ListCert = "list-cert"
-
-	// ListAuthority event is issued to stream loaded certification authority information
-	// during an active_list-authorities_ command.
-	ListAuthority = "list-authority"
-
-	// IKEUpdown event is issued when an IKE_SA is established or terminated.
-	IKEUpdown = "ike-updown"
-
-	// IKERekey event is issued when an IKE_SA is rekeyed.
-	IKERekey = "ike-rekey"
-
-	// ChildUpdown event is issued when a CHILD_SA is established or terminated.
-	ChildUpdown = "child-updown"
-
-	// ChildRekey event is issued when a CHILD_SA is rekeyed.
-	ChildRekey = "child-rekey"
-)
-
 var (
 	// Event listener channel was closed
 	errChannelClosed = errors.New("vici: event listener channel closed")
@@ -79,7 +41,6 @@ type eventListener struct {
 func newEventListener(t *transport) *eventListener {
 	return &eventListener{
 		transport: t,
-		mc:        make(chan *Message),
 	}
 }
 
@@ -114,6 +75,8 @@ func (el *eventListener) safeListen(events []string) (err error) {
 }
 
 func (el *eventListener) listen() {
+	// Add small buffer to allow for event processing
+	el.mc = make(chan *Message, 10)
 	defer close(el.mc)
 
 	for {

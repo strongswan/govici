@@ -24,14 +24,7 @@
 package vici
 
 import (
-	"errors"
-	"fmt"
-	"strconv"
 	"sync"
-)
-
-var (
-	errExpectedKey = errors.New("vici: expected message to contain key")
 )
 
 // Session is a vici client session.
@@ -67,372 +60,32 @@ func NewSession() (*Session, error) {
 	return s, nil
 }
 
-// Version returns daemon and system specific version information.
-func (s *Session) Version() (*Message, error) {
-	return s.sendRequest("version", nil)
+// CommandRequest sends a command request to the server, and returns the server's response.
+// The command is specified by cmd, and its arguments are provided by msg. An error is returned
+// if an error occurs while communicating with the daemon. To determine if a command was successful,
+// use Message.CheckError.
+func (s *Session) CommandRequest(cmd string, msg *Message) (*Message, error) {
+	return s.sendRequest(cmd, msg)
 }
 
-// Stats returns IKE daemon statistics and load information.
-func (s *Session) Stats() (*Message, error) {
-	return s.sendRequest("stats", nil)
-}
-
-// ReloadSettings reloads strongswan.conf settings and all plugins supporting
-// configuration reload.
-func (s *Session) ReloadSettings() error {
-	m, err := s.sendRequest("reload-settings", nil)
-	if err != nil {
-		return err
-	}
-
-	return m.CheckSuccess()
-}
-
-// Initiate initiates an SA.
-func (s *Session) Initiate(msg *Message) (*MessageStream, error) {
-	return s.sendStreamedRequest("initiate", ControlLog, msg)
-}
-
-// Terminate terminates an SA.
-func (s *Session) Terminate(msg *Message) (*MessageStream, error) {
-	return s.sendStreamedRequest("terminate", ControlLog, msg)
-}
-
-// Rekey initiates the re-keying of an SA, and returns the number of matched SAs,
-// and non-nil error if there is a problem with the request.
-func (s *Session) Rekey(msg *Message) (int, error) {
-	m, err := s.sendRequest("rekey", msg)
-	if err != nil {
-		return -1, err
-	}
-
-	n := m.Get("matches")
-	if n == nil {
-		return -1, fmt.Errorf("%v: matches", errExpectedKey)
-	}
-
-	return strconv.Atoi(n.(string))
-}
-
-// Redirect redirects a client-initiated IKE_SA to another gateway, only for IKEv2 and
-// if supported by the peer. Returns the number of matched SAs, and non-nil error if there
-// is a problem with the request.
-func (s *Session) Redirect(msg *Message) (int, error) {
-	m, err := s.sendRequest("redirect", msg)
-	if err != nil {
-		return -1, err
-	}
-
-	n := m.Get("matches")
-	if n == nil {
-		return -1, fmt.Errorf("%v: matches", errExpectedKey)
-	}
-
-	return strconv.Atoi(n.(string))
-}
-
-// Install installs a trap, drop or bypass policy defined by a CHILD_SA config.
-func (s *Session) Install(msg *Message) error {
-	m, err := s.sendRequest("install", msg)
-	if err != nil {
-		return err
-	}
-
-	return m.CheckSuccess()
-}
-
-// Uninstall uninstalls a trap, drop or bypass policy defined by a CHILD_SA config.
-func (s *Session) Uninstall(msg *Message) (*Message, error) {
-	return s.sendRequest("uninstall", msg)
-}
-
-// ListSAs lists currently active IKE_SAs and associated CHILD_SAs by streaming `list-sa`
-// events.
-func (s *Session) ListSAs(msg *Message) (*MessageStream, error) {
-	return s.sendStreamedRequest("list-sas", ListSA, msg)
-}
-
-// ListPolicies lists currently active trap, drop and bypass policies by streaming
-// `list-policy` events.
-func (s *Session) ListPolicies(msg *Message) (*MessageStream, error) {
-	return s.sendStreamedRequest("list-policies", ListPolicy, msg)
-}
-
-// ListConns lists currently loaded connections by streaming `list-conn` events, which includes
-// all connections known by the daemon, not only those loaded over vici.
-func (s *Session) ListConns(msg *Message) (*MessageStream, error) {
-	return s.sendStreamedRequest("list-conns", ListConn, msg)
-}
-
-// GetConns returns a list of connection names exclusively loaded over vici, not including connections
-// found in other backends. Returns a list of connection names, and non-nil error if there is a problem
-// with the request.
-func (s *Session) GetConns() ([]string, error) {
-	m, err := s.sendRequest("get-conns", nil)
-	if err != nil {
-		return []string{}, err
-	}
-
-	conns := m.Get("conns")
-	if conns == nil {
-		return []string{}, fmt.Errorf("%v: conns", errExpectedKey)
-	}
-
-	return conns.([]string), nil
-}
-
-// ListCerts lists currently loaded certificates by streaming `list-cert` events, which includes all
-// certificates known by the daemon, not only those loaded over vici.
-func (s *Session) ListCerts(msg *Message) (*MessageStream, error) {
-	return s.sendStreamedRequest("lsit-certs", ListCert, msg)
-}
-
-// ListAuthorities lists currently loaded CA information by streaming `list-authority` events.
-func (s *Session) ListAuthorities(msg *Message) (*MessageStream, error) {
-	return s.sendStreamedRequest("list-authorities", ListAuthority, msg)
-}
-
-// GetAuthorities returns a list of currently loaded CA names, and non-nil error if
-// there is a problem with the request.
-func (s *Session) GetAuthorities() ([]string, error) {
-	m, err := s.sendRequest("get-authorities", nil)
-	if err != nil {
-		return []string{}, err
-	}
-
-	authorities := m.Get("authorities")
-	if authorities == nil {
-		return []string{}, fmt.Errorf("%v: authorities", errExpectedKey)
-	}
-
-	return authorities.([]string), nil
-}
-
-// LoadConn loads a single connection definition to the daemon. An existing connection with the same name
-// gets updated or replaced.
-func (s *Session) LoadConn(msg *Message) error {
-	m, err := s.sendRequest("load-conn", msg)
-	if err != nil {
-		return err
-	}
-
-	return m.CheckSuccess()
-}
-
-// UnloadConn unloads a previously loaded connection by name.
-func (s *Session) UnloadConn(msg *Message) error {
-	m, err := s.sendRequest("unload-conn", msg)
-	if err != nil {
-		return err
-	}
-
-	return m.CheckSuccess()
-}
-
-// LoadCert loads a certificate into the daemon.
-func (s *Session) LoadCert(msg *Message) error {
-	m, err := s.sendRequest("load-cert", msg)
-	if err != nil {
-		return err
-	}
-
-	return m.CheckSuccess()
-}
-
-// LoadKey loads a private key into the daemon. The hex encoded SHA-1 key identifier of the
-// public key is returned on success (in string representation), and non-nil error otherwise.
-func (s *Session) LoadKey(msg *Message) (string, error) {
-	m, err := s.sendRequest("load-key", msg)
-	if err != nil {
-		return "", err
-	}
-
-	id := m.Get("id")
-	if id == nil {
-		return "", fmt.Errorf("%v: id", errExpectedKey)
-	}
-
-	return id.(string), nil
-}
-
-// UnloadKey unloads a key with the given key identifier.
-func (s *Session) UnloadKey(msg *Message) error {
-	m, err := s.sendRequest("unload-key", msg)
-	if err != nil {
-		return err
-	}
-
-	return m.CheckSuccess()
-}
-
-// GetKeys returns a list of identifiers of private keys loaded exclusively over vici, not including keys
-// found in other backends. Returns non-nil error if there is a problem with the request.
-func (s *Session) GetKeys() ([]string, error) {
-	m, err := s.sendRequest("get-keys", nil)
-	if err != nil {
-		return []string{}, err
-	}
-
-	keys := m.Get("keys")
-	if keys == nil {
-		return []string{}, fmt.Errorf("%v: keys", errExpectedKey)
-	}
-
-	return keys.([]string), nil
-}
-
-// LoadToken loads a private key located on a token into the daemon. Such keys may be listed and unloaded using the
-// get-keys and unload-key commands, respectively (based on the key identifier derived from the public key).
-// Returns the hex encoded SHA-1 public key identifier (string representation) on success, and non-nil error otherwise.
-func (s *Session) LoadToken(msg *Message) (string, error) {
-	m, err := s.sendRequest("load-token", msg)
-	if err != nil {
-		return "", err
-	}
-
-	id := m.Get("id")
-	if id == nil {
-		return "", fmt.Errorf("%v: id", errExpectedKey)
-	}
-
-	return id.(string), nil
-}
-
-// LoadShared loads a shared IKE PSK, EAP, XAuth or NTLM secret into the daemon.
-func (s *Session) LoadShared(msg *Message) error {
-	m, err := s.sendRequest("load-shared", msg)
-	if err != nil {
-		return err
-	}
-
-	return m.CheckSuccess()
-}
-
-// UnloadShared unloads a previously shared IKE PSK, EAP, XAuth or NTLM secret by its unique identifier.
-func (s *Session) UnloadShared(msg *Message) error {
-	m, err := s.sendRequest("unload-shared", msg)
-	if err != nil {
-		return err
-	}
-
-	return m.CheckSuccess()
-}
-
-// GetShared returns a list of unique identifiers of shared keys loaded exclusively over vici, not including
-// keys found in other backends. Returns non-nil error if there is a problem with the request.
-func (s *Session) GetShared() ([]string, error) {
-	m, err := s.sendRequest("get-shared", nil)
-	if err != nil {
-		return []string{}, err
-	}
-
-	shared := m.Get("keys")
-	if shared == nil {
-		return []string{}, fmt.Errorf("%v: keys", errExpectedKey)
-	}
-
-	return shared.([]string), nil
-}
-
-// FlushCerts flushes the certificate cache. The optional type argument allows to flush only certificates of
-// a given type, e.g. cached CRLs.
-func (s *Session) FlushCerts(msg *Message) error {
-	m, err := s.sendRequest("flush-certs", msg)
-	if err != nil {
-		return err
-	}
-
-	return m.CheckSuccess()
-}
-
-// ClearCreds clears all loaded certificate, private key and shared key credentials. This only affects credentials
-// loaded over vici but additionally flushes the credential cache.
-func (s *Session) ClearCreds() error {
-	m, err := s.sendRequest("clear-creds", nil)
-	if err != nil {
-		return err
-	}
-
-	return m.CheckSuccess()
-}
-
-// LoadAuthority loads a single CA definition into the daemon. An exisiting authority with the same name gets replaced.
-func (s *Session) LoadAuthority(msg *Message) error {
-	m, err := s.sendRequest("load-authority", msg)
-	if err != nil {
-		return err
-	}
-
-	return m.CheckSuccess()
-}
-
-// UnloadAuthority unloads a previously loaded CA definition by name.
-func (s *Session) UnloadAuthority(msg *Message) error {
-	m, err := s.sendRequest("unload-authority", msg)
-	if err != nil {
-		return err
-	}
-
-	return m.CheckSuccess()
-}
-
-// LoadPool loads an in-memory virtual IP and configuration attribute pool. Exisiting pools with the same name
-// get updated, if possible.
-func (s *Session) LoadPool(msg *Message) error {
-	m, err := s.sendRequest("load-pool", msg)
-	if err != nil {
-		return err
-	}
-
-	return m.CheckSuccess()
-}
-
-// UnloadPool unloads a previously loaded virtual IP and configuration attribute pool. Unloading fails for pools
-// with leases currently online.
-func (s *Session) UnloadPool(msg *Message) error {
-	m, err := s.sendRequest("unload-pool", msg)
-	if err != nil {
-		return err
-	}
-
-	return m.CheckSuccess()
-}
-
-// GetPools lists the currently loaded pools.
-func (s *Session) GetPools(msg *Message) (*Message, error) {
-	return s.sendRequest("get-pools", msg)
-}
-
-// GetAlgorithms lists currently loaded algorithms and their implementation.
-func (s *Session) GetAlgorithms() (*Message, error) {
-	return s.sendRequest("get-algorithms", nil)
-}
-
-// GetCounters lists global or connection-specific counters for several IKE events.
-func (s *Session) GetCounters(msg *Message) (*Message, error) {
-	return s.sendRequest("get-counters", msg)
-}
-
-// ResetCounters resets global or connection-specific IKE event counters.
-func (s *Session) ResetCounters(msg *Message) error {
-	m, err := s.sendRequest("reset-counters", msg)
-	if err != nil {
-		return err
-	}
-
-	return m.CheckSuccess()
+// StreamedCommandRequest sends a streamed command request to the server. StreamedCommandRequest
+// behaves like CommandRequest, but accepts an event argument, which specifies the event type
+// to stream while the command request is active. The complete stream of messages received from
+// the server is returned once the request is complete.
+func (s *Session) StreamedCommandRequest(cmd string, event string, msg *Message) (*MessageStream, error) {
+	return s.sendStreamedRequest(cmd, event, msg)
 }
 
 // Listen registers the session to listen for all events given. Listen does not return
 // unless the event channel is closed. To receive events that are registered here, use
-// NextEvent.
+// NextEvent. Listen should not be called again until the previous call has returned.
 func (s *Session) Listen(events []string) error {
 	return s.el.safeListen(events)
 }
 
 // NextEvent returns the next event received by the session event listener.  NextEvent is a
 // blocking call. If there is no event in the event buffer, NextEvent will wait to return until
-// a new event is received.
+// a new event is received. An error is returned
 func (s *Session) NextEvent() (*Message, error) {
 	return s.el.nextEvent()
 }

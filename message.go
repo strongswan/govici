@@ -59,7 +59,7 @@ var (
 	// Encountered unsupported type when encoding a message
 	errUnsupportedType = errors.New("vici: unsupported message element type")
 
-	// Used in CheckSuccess - the 'success' field was set to "no"
+	// Used in CheckError - the 'success' field was set to "no"
 	errCommandFailed = errors.New("vici: command failed")
 
 	// Base message for decoding errors that are due to an incorrectly formatted message
@@ -154,10 +154,10 @@ func (m *Message) Keys() []string {
 	return m.keys
 }
 
-// CheckSuccess examines a command response Message, and determines if it was successful.
+// CheckError examines a command response Message, and determines if it was successful.
 // If it was, or if the message does not contain a 'success' field, nil is returned. Otherwise,
 // an error is returned using the 'errmsg' field.
-func (m *Message) CheckSuccess() error {
+func (m *Message) CheckError() error {
 	if success, ok := m.data["success"]; ok {
 		if success != "yes" {
 			return fmt.Errorf("%v: %v", errCommandFailed, m.data["errmsg"])
