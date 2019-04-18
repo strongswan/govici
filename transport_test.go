@@ -45,7 +45,7 @@ func TestTransportSend(t *testing.T) {
 		}
 
 		if !bytes.Equal(b[:n], goldNamedPacketBytes) {
-			t.Errorf("Recieved byte stream does not equal gold bytes.\nExpected: %v\nReceived: %v", goldUnnamedPacketBytes, b)
+			t.Errorf("Received byte stream does not equal gold bytes.\nExpected: %v\nReceived: %v", goldUnnamedPacketBytes, b)
 		}
 	}()
 
