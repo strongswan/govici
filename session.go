@@ -18,9 +18,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-// Package vici implements a strongSwan vici protocol client. The go package is
-// documented here. For a complete overview and specification of the vici protocol
-// visit https://www.strongswan.org/apidoc/md_src_libcharon_plugins_vici_README.html.
+// Package vici implements a strongSwan vici protocol client. The Go package is
+// documented here. For a complete overview and specification of the vici
+// protocol visit:
+//
+//     https://www.strongswan.org/apidoc/md_src_libcharon_plugins_vici_README.html
+//
 package vici
 
 import (
