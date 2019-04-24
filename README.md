@@ -1,5 +1,6 @@
 # govici
 
+[![Build Status](https://travis-ci.org/strongswan/govici.svg?branch=master)](https://travis-ci.org/strongswan/govici)
 [![GoDoc](https://godoc.org/github.com/strongswan/govici?status.svg)](https://godoc.org/github.com/strongswan/govici)
 [![Go Report Card](https://goreportcard.com/badge/github.com/strongswan/govici)](https://goreportcard.com/report/github.com/strongswan/govici)
 
