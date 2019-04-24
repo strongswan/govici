@@ -1,16 +1,16 @@
-# go-vici
+# govici
 
-[![GoDoc](https://godoc.org/github.com/enr0n/vici?status.svg)](https://godoc.org/github.com/enr0n/vici)
-[![Go Report Card](https://goreportcard.com/badge/github.com/enr0n/vici)](https://goreportcard.com/report/github.com/enr0n/vici)
+[![GoDoc](https://godoc.org/github.com/strongswan/govici?status.svg)](https://godoc.org/github.com/strongswan/govici)
+[![Go Report Card](https://goreportcard.com/badge/github.com/strongswan/govici)](https://goreportcard.com/report/github.com/strongswan/govici)
 
 ## About
 
-The strongSwan [vici protocol](https://www.strongswan.org/apidoc/md_src_libcharon_plugins_vici_README.html) is used for external applications to monitor, configure, and control the IKE daemon charon. This go package provides a pure-go implementation of a vici client library. 
+The strongSwan [vici protocol](https://www.strongswan.org/apidoc/md_src_libcharon_plugins_vici_README.html) is used for external applications to monitor, configure, and control the IKE daemon charon. This Go package provides a pure-go implementation of a vici client library.
 
-The package documentation can be found on [godoc](https://godoc.org/github.com/enr0n/vici).
+The package documentation can be found on [godoc](https://godoc.org/github.com/strongswan/govici).
 
 ## Getting started
-`go get -u github.com/enr0n/vici`
+`go get -u github.com/strongswan/govici`
 
 ## Examples
 
@@ -27,8 +27,7 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/enr0n/vici"
+	"github.com/strongswan/govici"
 )
 
 func main() {
@@ -59,8 +58,7 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/enr0n/vici"
+	"github.com/strongswan/govici"
 )
 
 func main() {
@@ -97,8 +95,7 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/enr0n/vici"
+	"github.com/strongswan/govici"
 )
 
 func main() {
@@ -138,7 +135,7 @@ func main() {
 
 #### initiate
 
-This example shows how to use `StreamedCommandRequest`. The command `"initiate"` initiates an SA while streaming `"control-log"` events. A `MessageStream` is returned after all messages have been recieved, and the session has stopped listening for `"control-log"` events (unless otherwise specified using `Listen`).
+This example shows how to use `StreamedCommandRequest`. The command `"initiate"` initiates an SA while streaming `"control-log"` events. A `MessageStream` is returned after all messages have been received, and the session has stopped listening for `"control-log"` events (unless otherwise specified using `Listen`).
 
 This also shows how `MarshalMessage` can be used to construct a `Message` from a struct by using struct tags.
 
@@ -147,8 +144,7 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/enr0n/vici"
+	"github.com/strongswan/govici"
 )
 
 type initiateOptions struct {
@@ -202,8 +198,7 @@ package main
 
 import (
 	"fmt"
-
-	"github.com/enr0n/vici"
+	"github.com/strongswan/govici"
 )
 
 func main() {
