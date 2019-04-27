@@ -179,3 +179,62 @@ func TestUnmarshalMessage(t *testing.T) {
 		t.Errorf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", goldUnmarshaled, *tm)
 	}
 }
+
+func TestMessageGet(t *testing.T) {
+	v := goldMessage.Get("key1")
+	if value, ok := v.(string); !ok {
+		t.Errorf("Expected %v to be string: received %T", value, value)
+	} else if value != "value1" {
+		t.Errorf("Expected 'key1' to be 'value1': received %v", value)
+	}
+
+	v = goldMessage.Get("invalid")
+	if v != nil {
+		t.Errorf("Expected nil for Get on non-existent key: received %v", v)
+	}
+}
+
+func TestMessageSet(t *testing.T) {
+	m := NewMessage()
+
+	err := m.Set("key1", "value1")
+	if err != nil {
+		t.Errorf("Unexpected error setting string in message: %v", err)
+	}
+
+	err = m.Set("list1", []string{"value1", "value2"})
+	if err != nil {
+		t.Errorf("Unexpected error setting list in message: %v", err)
+	}
+
+	err = m.Set("section1", NewMessage())
+	if err != nil {
+		t.Errorf("Unexpected error setting sub-message in message: %v", err)
+	}
+
+	err = m.Set("invalid", 0)
+	if err == nil {
+		t.Errorf("Expected a non-nil error setting unsupported message element type '%T'", 0)
+	}
+
+	// Make sure that keys are not duplicated
+	err = m.Set("key1", "newValue")
+	if err != nil {
+		t.Errorf("Unexpected error setting string in message: %v", err)
+	}
+
+	if v := m.Get("key1"); v.(string) != "newValue" {
+		t.Errorf("Expected old value of 'key1' to be overwritten: key1=%v", v)
+	}
+
+	indices := make([]int, 0)
+	for i, v := range m.Keys() {
+		if v == "key1" {
+			indices = append(indices, i)
+		}
+	}
+
+	if len(indices) != 1 {
+		t.Errorf("Expected unique message keys: found %v instances of 'key1'", len(indices))
+	}
+}
