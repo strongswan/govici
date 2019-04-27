@@ -134,6 +134,9 @@ func UnmarshalMessage(m *Message, v interface{}) error {
 
 // Set sets key to value. An error is returned if value's underlying
 // type is not supported as a Message element type.
+//
+// If the key already exists the value is overwritten, but the ordering
+// of the message is not changed.
 func (m *Message) Set(key string, value interface{}) error {
 	return m.addItem(key, value)
 }
@@ -170,6 +173,9 @@ func (m *Message) CheckError() error {
 func (m *Message) addItem(key string, value interface{}) error {
 	rv := reflect.ValueOf(value)
 
+	// Check if the key is already set in the message
+	_, exists := m.data[key]
+
 	switch rv.Kind() {
 
 	case reflect.String:
@@ -193,7 +199,10 @@ func (m *Message) addItem(key string, value interface{}) error {
 		return errUnsupportedType
 	}
 
-	m.keys = append(m.keys, key)
+	// Only append to keys if this is a new key.
+	if !exists {
+		m.keys = append(m.keys, key)
+	}
 
 	return nil
 }
