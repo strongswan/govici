@@ -89,7 +89,7 @@ func main() {
 
 #### install
 
-Use `Set` to populate a `Message` with the arguments needed for a command. Here, the command `"install"` accepts a child SA name and an optional IKE SA name to find the child under. The success of the command can be checked using `CheckError`.
+Use `Set` to populate a `Message` with the arguments needed for a command. Here, the command `"install"` accepts a child SA name and an optional IKE SA name to find the child under. The success of the command can be checked using `Err`.
 
 ```go
 package main
@@ -124,7 +124,7 @@ func main() {
 		return
 	}
 
-        if resp.CheckError() != nil {
+        if resp.Err() != nil {
                 fmt.Println("Command failed:", err)
         }
 

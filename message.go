@@ -157,10 +157,10 @@ func (m *Message) Keys() []string {
 	return m.keys
 }
 
-// CheckError examines a command response Message, and determines if it was successful.
+// Err examines a command response Message, and determines if it was successful.
 // If it was, or if the message does not contain a 'success' field, nil is returned. Otherwise,
 // an error is returned using the 'errmsg' field.
-func (m *Message) CheckError() error {
+func (m *Message) Err() error {
 	if success, ok := m.data["success"]; ok {
 		if success != "yes" {
 			return fmt.Errorf("%v: %v", errCommandFailed, m.data["errmsg"])

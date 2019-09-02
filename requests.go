@@ -46,7 +46,7 @@ func (s *Session) sendRequest(cmd string, msg *Message) (*Message, error) {
 		return nil, fmt.Errorf("%v: %v", errUnexpectedResponse, p.ptype)
 	}
 
-	if err := p.msg.CheckError(); err != nil {
+	if err := p.msg.Err(); err != nil {
 		return nil, err
 	}
 
