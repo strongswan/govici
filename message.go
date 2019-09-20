@@ -767,7 +767,10 @@ func (m *Message) marshal(v interface{}) error {
 func (m *Message) marshalField(name string, rv reflect.Value) error {
 	switch rv.Kind() {
 
-	case reflect.String, reflect.Slice, reflect.Array:
+	case reflect.String:
+		return m.addItem(name, rv.String())
+
+	case reflect.Slice, reflect.Array:
 		return m.addItem(name, rv.Interface())
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
@@ -849,7 +852,7 @@ func (m *Message) unmarshalField(field reflect.Value, rv reflect.Value) error {
 		if _, ok := rv.Interface().(string); !ok {
 			return fmt.Errorf("%v: string and %v", errUnmarshalTypeMismatch, rv.Type())
 		}
-		field.Set(rv)
+		field.SetString(rv.String())
 
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		raw, ok := rv.Interface().(string)

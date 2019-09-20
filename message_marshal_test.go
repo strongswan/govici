@@ -159,3 +159,26 @@ func TestMarshalUint8(t *testing.T) {
 		t.Errorf("Marshalled uint8 value is invalid.\nExpected: 23\nReceived: %+v", value)
 	}
 }
+
+func TestMarshalEnumType(t *testing.T) {
+
+	type TestType string
+	const testValue TestType = "test-value"
+
+	enumMessage := struct {
+		Field TestType `vici:"field"`
+	}{
+		Field: testValue,
+	}
+
+	m, err := MarshalMessage(enumMessage)
+	if err != nil {
+		t.Fatalf("Error marshalling enum type value: %v", err)
+	}
+
+	value := m.Get("field")
+	if value.(string) != string(testValue) {
+		t.Errorf("Marshalled enum type value is invalid.\nExpected: %+v\nReceived: %+v", testValue, value)
+	}
+
+}

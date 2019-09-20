@@ -240,3 +240,29 @@ func TestUnmarshalUintInvalid(t *testing.T) {
 		t.Error("Expected error when unmarshalling invalid uint value. None was returned.")
 	}
 }
+
+func TestUnmarshalEnumType(t *testing.T) {
+
+	type TestType string
+	const testValue TestType = "test-value"
+
+	enumMessage := struct {
+		Field TestType `vici:"field"`
+	}{}
+
+	m := &Message{
+		[]string{"field"},
+		map[string]interface{}{
+			"field": "test-value",
+		},
+	}
+
+	err := UnmarshalMessage(m, &enumMessage)
+	if err != nil {
+		t.Fatalf("Error unmarshalling enum type value: %v", err)
+	}
+
+	if enumMessage.Field != testValue {
+		t.Errorf("Unmarshalled uint value is invalid.\nExpected: %+v\nReceived: %+v", testValue, enumMessage.Field)
+	}
+}
