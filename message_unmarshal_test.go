@@ -41,7 +41,7 @@ func TestUnmarshalBoolTrue(t *testing.T) {
 
 	err := UnmarshalMessage(m, &boolMessage)
 	if err != nil {
-		t.Errorf("Error unmarshalling bool value: %v", err)
+		t.Fatalf("Error unmarshalling bool value: %v", err)
 	}
 
 	if boolMessage.Field != true {
@@ -66,7 +66,7 @@ func TestUnmarshalBoolFalse(t *testing.T) {
 
 	err := UnmarshalMessage(m, &boolMessage)
 	if err != nil {
-		t.Errorf("Error unmarshalling bool value: %v", err)
+		t.Fatalf("Error unmarshalling bool value: %v", err)
 	}
 
 	if boolMessage.Field != false {
@@ -92,5 +92,151 @@ func TestUnmarshalBoolInvalid(t *testing.T) {
 	err := UnmarshalMessage(m, &boolMessage)
 	if err == nil {
 		t.Error("Expected error when unmarshalling invalid boolean value. None was returned.")
+	}
+}
+
+func TestUnmarshalInt(t *testing.T) {
+
+	intMessage := struct {
+		Field int `vici:"field"`
+	}{
+		Field: 0,
+	}
+
+	m := &Message{
+		[]string{"field"},
+		map[string]interface{}{
+			"field": "23",
+		},
+	}
+
+	err := UnmarshalMessage(m, &intMessage)
+	if err != nil {
+		t.Fatalf("Error unmarshalling int value: %v", err)
+	}
+
+	if intMessage.Field != 23 {
+		t.Errorf("Unmarshalled int value is invalid.\nExpected: 23\nReceived: %+v", intMessage.Field)
+	}
+}
+
+func TestUnmarshalInt2(t *testing.T) {
+
+	intMessage := struct {
+		Field int `vici:"field"`
+	}{
+		Field: 0,
+	}
+
+	m := &Message{
+		[]string{"field"},
+		map[string]interface{}{
+			"field": "-23",
+		},
+	}
+
+	err := UnmarshalMessage(m, &intMessage)
+	if err != nil {
+		t.Fatalf("Error unmarshalling int value: %v", err)
+	}
+
+	if intMessage.Field != -23 {
+		t.Errorf("Unmarshalled int value is invalid.\nExpected: -23\nReceived: %+v", intMessage.Field)
+	}
+}
+
+func TestUnmarshalInt8(t *testing.T) {
+
+	intMessage := struct {
+		Field int8 `vici:"field"`
+	}{
+		Field: 0,
+	}
+
+	m := &Message{
+		[]string{"field"},
+		map[string]interface{}{
+			"field": "23",
+		},
+	}
+
+	err := UnmarshalMessage(m, &intMessage)
+	if err != nil {
+		t.Fatalf("Error unmarshalling int8 value: %v", err)
+	}
+
+	if intMessage.Field != 23 {
+		t.Errorf("Unmarshalled int8 value is invalid.\nExpected: 23\nReceived: %+v", intMessage.Field)
+	}
+}
+
+func TestUnmarshalInt8Overflow(t *testing.T) {
+
+	intMessage := struct {
+		Field int8 `vici:"field"`
+	}{
+		Field: 0,
+	}
+
+	m := &Message{
+		[]string{"field"},
+		map[string]interface{}{
+			"field": "1001",
+		},
+	}
+
+	err := UnmarshalMessage(m, &intMessage)
+	if err != nil {
+		t.Fatalf("Error unmarshalling int8 value: %v", err)
+	}
+
+	if intMessage.Field == 23 {
+		t.Errorf("Unmarshalled int8 value is invalid.\nExpected: -23 (Overflow)\nReceived: %+v", intMessage.Field)
+	}
+}
+
+func TestUnmarshalUint(t *testing.T) {
+
+	intMessage := struct {
+		Field uint `vici:"field"`
+	}{
+		Field: 0,
+	}
+
+	m := &Message{
+		[]string{"field"},
+		map[string]interface{}{
+			"field": "23",
+		},
+	}
+
+	err := UnmarshalMessage(m, &intMessage)
+	if err != nil {
+		t.Fatalf("Error unmarshalling uint value: %v", err)
+	}
+
+	if intMessage.Field != 23 {
+		t.Errorf("Unmarshalled uint value is invalid.\nExpected: 23\nReceived: %+v", intMessage.Field)
+	}
+}
+
+func TestUnmarshalUintInvalid(t *testing.T) {
+
+	intMessage := struct {
+		Field uint `vici:"field"`
+	}{
+		Field: 0,
+	}
+
+	m := &Message{
+		[]string{"field"},
+		map[string]interface{}{
+			"field": "-1",
+		},
+	}
+
+	err := UnmarshalMessage(m, &intMessage)
+	if err == nil {
+		t.Error("Expected error when unmarshalling invalid uint value. None was returned.")
 	}
 }

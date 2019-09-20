@@ -35,7 +35,7 @@ func TestMarshalBoolTrue(t *testing.T) {
 
 	m, err := MarshalMessage(boolMessage)
 	if err != nil {
-		t.Errorf("Error marshalling bool value: %v", err)
+		t.Fatalf("Error marshalling bool value: %v", err)
 	}
 
 	value := m.Get("field")
@@ -55,7 +55,7 @@ func TestMarshalBoolFalse(t *testing.T) {
 
 	m, err := MarshalMessage(boolMessage)
 	if err != nil {
-		t.Errorf("Error marshalling bool value: %v", err)
+		t.Fatalf("Error marshalling bool value: %v", err)
 	}
 
 	value := m.Get("field")
@@ -63,4 +63,99 @@ func TestMarshalBoolFalse(t *testing.T) {
 		t.Errorf("Marshalled boolean value is invalid.\nExpected: no\nReceived: %+v", value)
 	}
 
+}
+
+func TestMarshalInt(t *testing.T) {
+
+	intMessage := struct {
+		Field int `vici:"field"`
+	}{
+		Field: 23,
+	}
+
+	m, err := MarshalMessage(intMessage)
+	if err != nil {
+		t.Fatalf("Error marshalling int value: %v", err)
+	}
+
+	value := m.Get("field")
+	if !reflect.DeepEqual(value, "23") {
+		t.Errorf("Marshalled int value is invalid.\nExpected: 23\nReceived: %+v", value)
+	}
+}
+
+func TestMarshalInt2(t *testing.T) {
+
+	intMessage := struct {
+		Field int `vici:"field"`
+	}{
+		Field: -23,
+	}
+
+	m, err := MarshalMessage(intMessage)
+	if err != nil {
+		t.Fatalf("Error marshalling int value: %v", err)
+	}
+
+	value := m.Get("field")
+	if !reflect.DeepEqual(value, "-23") {
+		t.Errorf("Marshalled int value is invalid.\nExpected: -23\nReceived: %+v", value)
+	}
+}
+
+func TestMarshalInt8(t *testing.T) {
+
+	intMessage := struct {
+		Field int8 `vici:"field"`
+	}{
+		Field: 23,
+	}
+
+	m, err := MarshalMessage(intMessage)
+	if err != nil {
+		t.Fatalf("Error marshalling int8 value: %v", err)
+	}
+
+	value := m.Get("field")
+	if !reflect.DeepEqual(value, "23") {
+		t.Errorf("Marshalled int8 value is invalid.\nExpected: 23\nReceived: %+v", value)
+	}
+}
+
+func TestMarshalUint(t *testing.T) {
+
+	intMessage := struct {
+		Field uint `vici:"field"`
+	}{
+		Field: 23,
+	}
+
+	m, err := MarshalMessage(intMessage)
+	if err != nil {
+		t.Fatalf("Error marshalling uint value: %v", err)
+	}
+
+	value := m.Get("field")
+	if !reflect.DeepEqual(value, "23") {
+		t.Errorf("Marshalled uint value is invalid.\nExpected: 23\nReceived: %+v", value)
+	}
+}
+
+func TestMarshalUint8(t *testing.T) {
+
+	intMessage := struct {
+		Field uint8 `vici:"field"`
+	}{
+		Field: 23,
+	}
+
+	m, err := MarshalMessage(intMessage)
+	if err != nil {
+		t.Fatalf("Error marshalling uint8 value: %v", err)
+	}
+
+	value := m.Get("field")
+	if !reflect.DeepEqual(value, "23") {
+		t.Errorf("Marshalled uint8 value is invalid.\nExpected: 23\nReceived: %+v", value)
+	}
 }

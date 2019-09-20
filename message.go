@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strconv"
 	"strings"
 )
 
@@ -769,6 +770,12 @@ func (m *Message) marshalField(name string, rv reflect.Value) error {
 	case reflect.String, reflect.Slice, reflect.Array:
 		return m.addItem(name, rv.Interface())
 
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return m.addItem(name, strconv.FormatInt(rv.Int(), 10))
+
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return m.addItem(name, strconv.FormatUint(rv.Uint(), 10))
+
 	case reflect.Bool:
 		if rv.Bool() {
 			return m.addItem(name, "yes")
@@ -843,6 +850,32 @@ func (m *Message) unmarshalField(field reflect.Value, rv reflect.Value) error {
 			return fmt.Errorf("%v: string and %v", errUnmarshalTypeMismatch, rv.Type())
 		}
 		field.Set(rv)
+
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		raw, ok := rv.Interface().(string)
+		if !ok {
+			return fmt.Errorf("%v: string and %v", errUnmarshalTypeMismatch, rv.Type())
+		}
+
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			return fmt.Errorf("%v: %v as %v", errUnmarshalParseFailure, raw, field.Type())
+		}
+
+		field.SetInt(parsed)
+
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		raw, ok := rv.Interface().(string)
+		if !ok {
+			return fmt.Errorf("%v: string and %v", errUnmarshalTypeMismatch, rv.Type())
+		}
+
+		parsed, err := strconv.ParseUint(raw, 10, 64)
+		if err != nil {
+			return fmt.Errorf("%v: %v as %v", errUnmarshalParseFailure, raw, field.Type())
+		}
+
+		field.SetUint(parsed)
 
 	case reflect.Bool:
 		raw, ok := rv.Interface().(string)
