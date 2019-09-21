@@ -27,6 +27,8 @@ import (
 	"fmt"
 	"io"
 	"reflect"
+	"strconv"
+	"strings"
 )
 
 const (
@@ -75,9 +77,11 @@ var (
 	errMarshalUnsupportedType = fmt.Errorf("%v: encountered unsupported type", errMarshal)
 
 	// Unmarshaling errors
-	errUnmarshalBadType      = fmt.Errorf("%v: type must be non-nil pointer", errUnmarshal)
-	errUnmarshalTypeMismatch = fmt.Errorf("%v: incompatible types", errUnmarshal)
-	errUnmarshalNonMessage   = fmt.Errorf("%v: encountered non-message type", errUnmarshal)
+	errUnmarshalBadType         = fmt.Errorf("%v: type must be non-nil pointer", errUnmarshal)
+	errUnmarshalTypeMismatch    = fmt.Errorf("%v: incompatible types", errUnmarshal)
+	errUnmarshalNonMessage      = fmt.Errorf("%v: encountered non-message type", errUnmarshal)
+	errUnmarshalUnsupportedType = fmt.Errorf("%v: encountered unsupported type", errUnmarshal)
+	errUnmarshalParseFailure    = fmt.Errorf("%v: failed to parse value", errUnmarshal)
 )
 
 // MessageStream is used to feed continuous data during a command request, and simply
@@ -699,6 +703,7 @@ func newMessageTag(tag reflect.StructTag) messageTag {
 }
 
 func emptyMessageElement(rv reflect.Value) bool {
+
 	switch rv.Kind() {
 
 	case reflect.Slice:
@@ -710,9 +715,13 @@ func emptyMessageElement(rv reflect.Value) bool {
 			z = z && emptyMessageElement(rv.Field(i))
 		}
 		return z
+
+	case reflect.Ptr, reflect.String:
+		return rv.Interface() == reflect.Zero(rv.Type()).Interface()
+
 	}
 
-	return rv.Interface() == reflect.Zero(rv.Type()).Interface()
+	return false
 }
 
 func (m *Message) marshal(v interface{}) error {
@@ -758,8 +767,23 @@ func (m *Message) marshal(v interface{}) error {
 func (m *Message) marshalField(name string, rv reflect.Value) error {
 	switch rv.Kind() {
 
-	case reflect.String, reflect.Slice, reflect.Array:
+	case reflect.String:
+		return m.addItem(name, rv.String())
+
+	case reflect.Slice, reflect.Array:
 		return m.addItem(name, rv.Interface())
+
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return m.addItem(name, strconv.FormatInt(rv.Int(), 10))
+
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return m.addItem(name, strconv.FormatUint(rv.Uint(), 10))
+
+	case reflect.Bool:
+		if rv.Bool() {
+			return m.addItem(name, "yes")
+		}
+		return m.addItem(name, "no")
 
 	case reflect.Ptr:
 		if _, ok := rv.Interface().(*Message); ok {
@@ -828,7 +852,50 @@ func (m *Message) unmarshalField(field reflect.Value, rv reflect.Value) error {
 		if _, ok := rv.Interface().(string); !ok {
 			return fmt.Errorf("%v: string and %v", errUnmarshalTypeMismatch, rv.Type())
 		}
-		field.Set(rv)
+		field.SetString(rv.String())
+
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		raw, ok := rv.Interface().(string)
+		if !ok {
+			return fmt.Errorf("%v: string and %v", errUnmarshalTypeMismatch, rv.Type())
+		}
+
+		parsed, err := strconv.ParseInt(raw, 10, 64)
+		if err != nil {
+			return fmt.Errorf("%v: %v as %v", errUnmarshalParseFailure, raw, field.Type())
+		}
+
+		field.SetInt(parsed)
+
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		raw, ok := rv.Interface().(string)
+		if !ok {
+			return fmt.Errorf("%v: string and %v", errUnmarshalTypeMismatch, rv.Type())
+		}
+
+		parsed, err := strconv.ParseUint(raw, 10, 64)
+		if err != nil {
+			return fmt.Errorf("%v: %v as %v", errUnmarshalParseFailure, raw, field.Type())
+		}
+
+		field.SetUint(parsed)
+
+	case reflect.Bool:
+		raw, ok := rv.Interface().(string)
+		if !ok {
+			return fmt.Errorf("%v: string and %v", errUnmarshalTypeMismatch, rv.Type())
+		}
+
+		switch strings.ToLower(raw) {
+		case "yes":
+			field.SetBool(true)
+
+		case "no":
+			field.SetBool(false)
+
+		default:
+			return fmt.Errorf("%v: %v as %v", errUnmarshalParseFailure, raw, field.Type())
+		}
 
 	case reflect.Slice:
 		if _, ok := rv.Interface().([]string); !ok {
@@ -862,6 +929,9 @@ func (m *Message) unmarshalField(field reflect.Value, rv reflect.Value) error {
 		}
 
 		field.Set(reflect.Indirect(fp))
+
+	default:
+		return fmt.Errorf("%v: %v", errUnmarshalUnsupportedType, field.Kind())
 	}
 
 	return nil
