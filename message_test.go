@@ -316,6 +316,21 @@ func TestUnmarshalMessageToNilPointer(t *testing.T) {
 	}
 }
 
+func TestUnmarshalMessageNestedNilPtr(t *testing.T) {
+	tm := &testMessage{
+		Message: NewMessage(),
+	}
+
+	err := UnmarshalMessage(goldMarshaled, tm)
+	if err != nil {
+		t.Errorf("Unexpected error unmarshaling: %v", err)
+	}
+
+	if !reflect.DeepEqual(*tm, goldUnmarshaled) {
+		t.Errorf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", goldUnmarshaled, *tm)
+	}
+}
+
 func TestMessageGet(t *testing.T) {
 	v := goldMessage.Get("key1")
 	if value, ok := v.(string); !ok {
