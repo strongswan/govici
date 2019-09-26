@@ -77,7 +77,7 @@ var (
 	errMarshalUnsupportedType = fmt.Errorf("%v: encountered unsupported type", errMarshal)
 
 	// Unmarshaling errors
-	errUnmarshalBadType         = fmt.Errorf("%v: type must be non-nil pointer", errUnmarshal)
+	errUnmarshalBadType         = fmt.Errorf("%v: type must be non-nil pointer or map", errUnmarshal)
 	errUnmarshalTypeMismatch    = fmt.Errorf("%v: incompatible types", errUnmarshal)
 	errUnmarshalNonMessage      = fmt.Errorf("%v: encountered non-message type", errUnmarshal)
 	errUnmarshalUnsupportedType = fmt.Errorf("%v: encountered unsupported type", errUnmarshal)
@@ -116,10 +116,11 @@ func NewMessage() *Message {
 	}
 }
 
-// MarshalMessage returns a Message marshaled from v. Only exported fields
-// with a `vici` tag explicitly set are marshaled. An error is returned
-// if v is not a struct (or a pointer to one), or an unsupported Message
-// element type is encountered.
+// MarshalMessage returns a Message marshaled from a map or struct (or struct pointer).
+// When marshaling a struct, only exported fields with a `vici` tag explicitly
+// set are marshaled.
+// An error is returned if the underlying type of v cannot be marshaled, or an
+// unsupported Message element type is encountered.
 func MarshalMessage(v interface{}) (*Message, error) {
 	m := NewMessage()
 	if err := m.marshal(v); err != nil {
@@ -129,9 +130,11 @@ func MarshalMessage(v interface{}) (*Message, error) {
 	return m, nil
 }
 
-// UnmarshalMessage unmarshals m to v. Fields of v are ignored unless
-// explicitly tagged and exported. The underlying value of v should be
-// a pointer to a struct.
+// UnmarshalMessage unmarshals m to a map or struct (or struct pointer).
+// When unmarshaling to a struct, only exported fields with a `vici` tag explicitly
+// set are unmarshaled.
+// An error is returned if the underlying value of v cannot be unmarshaled into, or
+// an unsupported type is encountered.
 func UnmarshalMessage(m *Message, v interface{}) error {
 	return m.unmarshal(v)
 }
@@ -719,6 +722,9 @@ func emptyMessageElement(rv reflect.Value) bool {
 	case reflect.Ptr, reflect.String:
 		return rv.Interface() == reflect.Zero(rv.Type()).Interface()
 
+	case reflect.Map:
+		return rv.IsNil() || len(rv.MapKeys()) == 0
+
 	}
 
 	return false
@@ -727,15 +733,24 @@ func emptyMessageElement(rv reflect.Value) bool {
 func (m *Message) marshal(v interface{}) error {
 	rv := reflect.ValueOf(v)
 
-	// v must either be a struct or a pointer to one
 	if rv.Kind() == reflect.Ptr {
 		rv = reflect.Indirect(rv)
 	}
 
-	if rv.Kind() != reflect.Struct {
+	switch rv.Kind() {
+	case reflect.Struct:
+		return m.marshalFromStruct(rv)
+
+	case reflect.Map:
+		return m.marshalFromMap(rv)
+
+	default:
 		return fmt.Errorf("%v: %v", errMarshalUnsupportedType, rv.Kind())
 	}
 
+}
+
+func (m *Message) marshalFromStruct(rv reflect.Value) error {
 	rt := rv.Type()
 	for i := 0; i < rt.NumField(); i++ {
 		rf := rt.Field(i)
@@ -764,7 +779,26 @@ func (m *Message) marshal(v interface{}) error {
 	return nil
 }
 
+func (m *Message) marshalFromMap(rv reflect.Value) error {
+	keys := rv.MapKeys()
+	for _, k := range keys {
+		v := rv.MapIndex(k)
+
+		err := m.marshalField(k.String(), v)
+		if err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
 func (m *Message) marshalField(name string, rv reflect.Value) error {
+
+	if rv.Kind() == reflect.Interface {
+		rv = reflect.ValueOf(rv.Interface())
+	}
+
 	switch rv.Kind() {
 
 	case reflect.String:
@@ -797,7 +831,7 @@ func (m *Message) marshalField(name string, rv reflect.Value) error {
 
 		return m.addItem(name, msg)
 
-	case reflect.Struct:
+	case reflect.Struct, reflect.Map:
 		msg := NewMessage()
 		if err := msg.marshal(rv.Interface()); err != nil {
 			return err
@@ -813,15 +847,38 @@ func (m *Message) marshalField(name string, rv reflect.Value) error {
 func (m *Message) unmarshal(v interface{}) error {
 	rv := reflect.ValueOf(v)
 
-	if rv.Kind() != reflect.Ptr {
-		return errUnmarshalBadType
+	switch rv.Kind() {
+	case reflect.Map:
+		// Must be a non-nil map.
+		if rv.IsNil() {
+			return errUnmarshalBadType
+		}
+
+		return m.unmarshalToMap(rv)
+
+	case reflect.Ptr:
+		// Must be a pointer to a struct.
+		if rv.IsNil() {
+			return errUnmarshalBadType
+		}
+
+		rv = reflect.Indirect(rv)
+		if rv.Kind() != reflect.Struct {
+			return fmt.Errorf("%v: cannot unmarshal into non-struct pointer %v", errUnmarshalUnsupportedType, rv.Kind())
+		}
+
+		return m.unmarshalToStruct(rv)
+
+	default:
+		return fmt.Errorf("%v: cannot unmarshal into %v", errUnmarshalUnsupportedType, rv.Kind())
+
 	}
 
-	if rv.IsNil() {
-		return errUnmarshalBadType
-	}
+}
 
-	rt := reflect.Indirect(rv).Type()
+func (m *Message) unmarshalToStruct(rv reflect.Value) error {
+	rt := rv.Type()
+
 	for i := 0; i < rt.NumField(); i++ {
 		rf := rt.Field(i)
 		tag := newMessageTag(rf.Tag)
@@ -831,7 +888,7 @@ func (m *Message) unmarshal(v interface{}) error {
 			continue
 		}
 
-		rfv := rv.Elem().Field(i)
+		rfv := rv.Field(i)
 		if !rfv.CanInterface() {
 			continue
 		}
@@ -840,6 +897,62 @@ func (m *Message) unmarshal(v interface{}) error {
 		if err != nil {
 			return err
 		}
+	}
+
+	return nil
+}
+
+func (m *Message) unmarshalToMap(rv reflect.Value) error {
+
+	if rv.Type().Key().Kind() != reflect.String {
+		return fmt.Errorf("%v: map keys of type %v are not compatible with string", errUnmarshalTypeMismatch, rv.Type().Key().Kind())
+	}
+
+	for e := range m.elements() {
+		key := reflect.ValueOf(e.k)
+		val := reflect.ValueOf(e.v)
+
+		rfv := rv.MapIndex(key)
+		mapElemType := rv.Type().Elem()
+
+		// We can't set the value of a map value directly since they are not
+		// addressable. Thus we must create a new value element and set that
+		// to the map instead.
+		switch mapElemType.Kind() {
+
+		case reflect.Ptr:
+			if !rfv.IsValid() {
+				rfv = reflect.New(mapElemType.Elem())
+			}
+
+		case reflect.Struct:
+			if !rfv.IsValid() {
+				rfv = reflect.Indirect(reflect.New(mapElemType))
+			}
+
+		case reflect.Slice:
+			if !rfv.IsValid() {
+				rfv = reflect.MakeSlice(mapElemType, 0, 0)
+			}
+
+		case reflect.Map:
+			if !rfv.IsValid() {
+				rfv = reflect.MakeMap(mapElemType)
+			}
+
+		case reflect.Interface:
+			return fmt.Errorf("%v: map values cannot be generic interfaces", errUnmarshalTypeMismatch)
+
+		default:
+			rfv = reflect.Indirect(reflect.New(mapElemType))
+		}
+
+		err := m.unmarshalField(rfv, val)
+		if err != nil {
+			return err
+		}
+
+		rv.SetMapIndex(key, rfv)
 	}
 
 	return nil
@@ -930,8 +1043,22 @@ func (m *Message) unmarshalField(field reflect.Value, rv reflect.Value) error {
 
 		field.Set(reflect.Indirect(fp))
 
+	case reflect.Map:
+		msg, ok := rv.Interface().(*Message)
+		if !ok {
+			return fmt.Errorf("%v: %v", errUnmarshalNonMessage, rv.Type())
+		}
+
+		fp := reflect.MakeMap(field.Type())
+		if err := msg.unmarshal(fp.Interface()); err != nil {
+			return err
+		}
+
+		field.Set(fp)
+
 	default:
 		return fmt.Errorf("%v: %v", errUnmarshalUnsupportedType, field.Kind())
+
 	}
 
 	return nil

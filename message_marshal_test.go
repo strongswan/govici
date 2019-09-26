@@ -182,3 +182,31 @@ func TestMarshalEnumType(t *testing.T) {
 	}
 
 }
+
+func TestMarshalEmbeddedMap(t *testing.T) {
+
+	mapValue := map[string]interface{}{"sub": goldUnmarshaled}
+
+	mapMessage := struct {
+		Field map[string]interface{} `vici:"field"`
+	}{
+		Field: mapValue,
+	}
+
+	m, err := MarshalMessage(mapMessage)
+	if err != nil {
+		t.Fatalf("Error marshalling map value: %v", err)
+	}
+
+	value := m.Get("field")
+	field, ok := value.(*Message)
+	if !ok {
+		t.Fatalf("Embedded map key was not marshaled as a sub-message")
+	}
+
+	value = field.Get("sub")
+	if !reflect.DeepEqual(value, goldMarshaled) {
+		t.Errorf("Marshalled map value is invalid.\nExpected: %+v\nReceived: %+v", goldMarshaled, value)
+	}
+
+}

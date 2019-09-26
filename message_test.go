@@ -23,6 +23,7 @@ package vici
 import (
 	"bytes"
 	"reflect"
+	"sort"
 	"testing"
 )
 
@@ -84,6 +85,14 @@ var (
 		},
 		Section1: testSection{Key: "key2"},
 		Section2: &testSection{List: []string{"item3", "item4"}},
+	}
+
+	goldUnmarshaledMap = map[string]interface{}{
+		"key":      goldUnmarshaled.Key,
+		"list":     goldUnmarshaled.List,
+		"message":  goldUnmarshaled.Message,
+		"section1": goldUnmarshaled.Section1,
+		"section2": goldUnmarshaled.Section2,
 	}
 
 	goldMarshaled = &Message{
@@ -165,11 +174,33 @@ func TestMarshalMessage(t *testing.T) {
 	}
 }
 
+func TestMarshalMessageMap(t *testing.T) {
+	m, err := MarshalMessage(goldUnmarshaledMap)
+	if err != nil {
+		t.Errorf("Unexpected error marshaling: %v", err)
+	}
+
+	// Map keys are unordered, so we need to compare differently
+
+	marshaledKeys := append(goldMarshaled.keys[:0:0], goldMarshaled.keys...)
+	sort.Strings(m.keys)
+	sort.Strings(marshaledKeys)
+
+	if !reflect.DeepEqual(m.keys, marshaledKeys) {
+		t.Errorf("Marshaled message does not equal gold marshaled message keys.\nExpected: %v\nReceived: %v", marshaledKeys, m.data)
+	}
+
+	if !reflect.DeepEqual(m.data, goldMarshaled.data) {
+		t.Errorf("Marshaled message does not equal gold marshaled message data.\nExpected: %v\nReceived: %v", goldMarshaled.data, m.data)
+	}
+}
+
 func TestUnmarshalMessage(t *testing.T) {
 	tm := &testMessage{
 		Message:  NewMessage(),
 		Section2: &testSection{},
 	}
+
 	err := UnmarshalMessage(goldMarshaled, tm)
 	if err != nil {
 		t.Errorf("Unexpected error unmarshaling: %v", err)
@@ -177,6 +208,111 @@ func TestUnmarshalMessage(t *testing.T) {
 
 	if !reflect.DeepEqual(*tm, goldUnmarshaled) {
 		t.Errorf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", goldUnmarshaled, *tm)
+	}
+}
+
+func TestUnmarshalMessageMapSimple(t *testing.T) {
+
+	marshaled := &Message{
+		keys: []string{"one", "two"},
+		data: map[string]interface{}{
+			"one": "1",
+			"two": "2",
+		},
+	}
+
+	tm := map[string]string{}
+
+	err := UnmarshalMessage(marshaled, tm)
+	if err != nil {
+		t.Fatalf("Unexpected error unmarshaling ot map: %v", err)
+	}
+
+	one, ok := tm["one"]
+	if !ok {
+		t.Fatalf("Unmarshaled message does not contain 'one'")
+	}
+	if one != "1" {
+		t.Errorf("Value of 'one' is incorrect.\nExpected: 1\nReceived: %s", one)
+	}
+
+	two, ok := tm["two"]
+	if !ok {
+		t.Fatalf("Unmarshaled message does not contain 'two'")
+	}
+	if two != "2" {
+		t.Errorf("Value of 'two' is incorrect.\nExpected: 2\nReceived: %s", two)
+	}
+
+}
+
+func TestUnmarshalMessageMapPointers(t *testing.T) {
+	marshaled := &Message{
+		keys: []string{"section1", "section2"},
+		data: map[string]interface{}{
+			"section1": goldMarshaled.data["section1"],
+			"section2": goldMarshaled.data["section2"],
+		},
+	}
+
+	tm := map[string]*testSection{}
+
+	err := UnmarshalMessage(marshaled, tm)
+	if err != nil {
+		t.Fatalf("Unexpected error unmarshaling to map: %v", err)
+	}
+
+	if !reflect.DeepEqual(tm["section1"], &goldUnmarshaled.Section1) {
+		t.Errorf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", &goldUnmarshaled.Section1, tm["section1"])
+	}
+
+	if !reflect.DeepEqual(tm["section2"], goldUnmarshaled.Section2) {
+		t.Errorf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", goldUnmarshaled.Section2, tm["section2"])
+	}
+}
+
+func TestUnmarshalMessageMapNotPointers(t *testing.T) {
+	marshaled := &Message{
+		keys: []string{"section1", "section2"},
+		data: map[string]interface{}{
+			"section1": goldMarshaled.data["section1"],
+			"section2": goldMarshaled.data["section2"]},
+	}
+
+	tm := map[string]testSection{}
+
+	err := UnmarshalMessage(marshaled, tm)
+	if err != nil {
+		t.Fatalf("Unexpected error unmarshaling to map: %v", err)
+	}
+
+	if !reflect.DeepEqual(tm["section1"], goldUnmarshaled.Section1) {
+		t.Errorf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", goldUnmarshaled.Section1, tm["section1"])
+	}
+
+	if !reflect.DeepEqual(tm["section2"], *goldUnmarshaled.Section2) {
+		t.Errorf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", *goldUnmarshaled.Section2, tm["section2"])
+	}
+}
+
+func TestUnmarshalMessageNotPointer(t *testing.T) {
+	tm := testMessage{
+		Message:  NewMessage(),
+		Section2: &testSection{},
+	}
+
+	err := UnmarshalMessage(goldMarshaled, tm)
+	if err == nil {
+		t.Errorf("Expected error when unmarshaling to non-pointer struct")
+	}
+}
+
+func TestUnmarshalMessageToNilPointer(t *testing.T) {
+	var tm *testMessage
+
+	err := UnmarshalMessage(goldMarshaled, tm)
+	if err == nil {
+		t.Errorf("Expected error when unmarshaling to nil pointer")
 	}
 }
 
