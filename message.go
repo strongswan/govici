@@ -1028,6 +1028,10 @@ func (m *Message) unmarshalField(field reflect.Value, rv reflect.Value) error {
 			return fmt.Errorf("%v: %v", errUnmarshalNonMessage, rv.Type())
 		}
 
+		if field.IsNil() {
+			field.Set(reflect.New(field.Type().Elem()))
+		}
+
 		return msg.unmarshal(field.Interface())
 
 	case reflect.Struct:
