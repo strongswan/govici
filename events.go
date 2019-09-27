@@ -21,8 +21,10 @@
 package vici
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"sync"
 )
 
 var (
@@ -30,65 +32,111 @@ var (
 	errChannelClosed = errors.New("vici: event listener channel closed")
 )
 
-type eventError struct{ error }
-
 type eventListener struct {
 	*transport
 
-	mc chan *Message
+	// Context supplied by caller through Listen.
+	lctx context.Context
+
+	ec     chan event
+	events []string
+
+	// Closing context and its cancel func are used to
+	// indicate that this event listener has been Close()'d.
+	//
+	// Use a sync.Once to make sure that destroy() is a no-op
+	// after first call to it.
+	ctx    context.Context
+	cancel context.CancelFunc
+	once   sync.Once
 }
 
-func newEventListener(t *transport) *eventListener {
+type event struct {
+	msg *Message
+	err error
+}
+
+func newEventListener(ctx context.Context, t *transport) *eventListener {
+	cctx, ccancel := context.WithCancel(context.Background())
+
 	return &eventListener{
 		transport: t,
+		lctx:      ctx,
+		ec:        make(chan event, 16),
+		ctx:       cctx,
+		cancel:    ccancel,
 	}
 }
 
-func (el *eventListener) nextEvent() (*Message, error) {
-	m := <-el.mc
-	if m == nil {
-		return nil, errChannelClosed
-	}
-
-	return m, nil
-}
-
-func (el *eventListener) safeListen(events []string) (err error) {
-	err = el.registerEvents(events)
-	if err != nil {
-		return err
-	}
-	defer el.unregisterEvents(events)
-	defer func() {
-		if r := recover(); r != nil {
-			if ee, ok := r.(eventError); ok {
-				err = ee.error
-			} else {
-				panic(r)
-			}
-		}
-	}()
-
-	el.listen()
+// Close closes the event channel.
+func (el *eventListener) Close() error {
+	el.cancel()
 
 	return nil
 }
 
-func (el *eventListener) listen() {
-	// Add small buffer to allow for event processing
-	el.mc = make(chan *Message, 10)
-	defer close(el.mc)
+// Done returns if the event listener is closed.
+func (el *eventListener) Done() <-chan struct{} {
+	return el.ctx.Done()
+}
 
-	for {
-		p, err := el.recv()
-		if err != nil {
-			panic(eventError{err})
-		}
+func (el *eventListener) destroy() {
+	el.once.Do(func() {
+		el.unregisterEvents(el.events)
+		close(el.ec)
+		el.conn.Close()
+	})
+}
 
-		if p.ptype == pktEvent {
-			el.mc <- p.msg
-		}
+func (el *eventListener) listen(events []string) (err error) {
+	err = el.registerEvents(events)
+	if err != nil {
+		return err
 	}
+	el.events = events
+
+	go func() {
+		defer el.destroy()
+
+		for {
+			select {
+			case <-el.lctx.Done():
+				// Caller cancelled their context.
+				return
+
+			case <-el.ctx.Done():
+				// Closer context was cancelled.
+				return
+
+			default:
+				var e event
+
+				p, err := el.recv()
+				if err != nil {
+					e.err = err
+					el.ec <- e
+
+					return
+				}
+
+				if p.ptype == pktEvent {
+					e.msg = p.msg
+					el.ec <- e
+				}
+			}
+		}
+	}()
+
+	return nil
+}
+
+func (el *eventListener) nextEvent() (*Message, error) {
+	e := <-el.ec
+	if e.msg == nil && e.err == nil {
+		return nil, errChannelClosed
+	}
+
+	return e.msg, e.err
 }
 
 func (el *eventListener) registerEvents(events []string) error {
