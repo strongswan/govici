@@ -70,6 +70,19 @@ func NewSession() (*Session, error) {
 	return s, nil
 }
 
+// Close closes the vici session.
+func (s *Session) Close() error {
+	if err := s.el.Close(); err != nil {
+		return err
+	}
+
+	if err := s.ctr.conn.Close(); err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // CommandRequest sends a command request to the server, and returns the server's response.
 // The command is specified by cmd, and its arguments are provided by msg. An error is returned
 // if an error occurs while communicating with the daemon. To determine if a command was successful,
