@@ -24,7 +24,9 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"net"
 	"sync"
+	"time"
 )
 
 var (
@@ -111,12 +113,21 @@ func (el *eventListener) listen(events []string) (err error) {
 			default:
 				var e event
 
+				// Set a read deadline so that this loop can continue
+				// at a reasonable pace. If the error is a timeout,
+				// do not send it on the event channel.
+				_ = el.conn.SetReadDeadline(time.Now().Add(time.Second))
+
 				p, err := el.recv()
 				if err != nil {
+					if ne, ok := err.(net.Error); ok && ne.Timeout() {
+						continue
+					}
 					e.err = err
-					el.ec <- e
 
-					return
+					// Send error event and continue in loop.
+					el.ec <- e
+					continue
 				}
 
 				if p.ptype == pktEvent {
@@ -183,6 +194,12 @@ func (el *eventListener) eventRegisterUnregister(event string, register bool) er
 
 func (el *eventListener) eventTransportCommunicate(pkt *packet) (*packet, error) {
 	err := el.send(pkt)
+	if err != nil {
+		return nil, err
+	}
+
+	// Refresh deadline for communication.
+	err = el.conn.SetReadDeadline(time.Now().Add(time.Second))
 	if err != nil {
 		return nil, err
 	}

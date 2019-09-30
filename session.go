@@ -29,6 +29,7 @@ package vici
 import (
 	"context"
 	"errors"
+	"net"
 	"sync"
 )
 
@@ -104,7 +105,7 @@ func (s *Session) StreamedCommandRequest(cmd string, event string, msg *Message)
 // are registered here, use NextEvent. An error is returned if Listen is called while
 // Session already has an event listener registered.
 func (s *Session) Listen(ctx context.Context, events ...string) error {
-	if err := s.maybeCreateEventListener(ctx); err != nil {
+	if err := s.maybeCreateEventListener(ctx, nil); err != nil {
 		return err
 	}
 	defer s.destroyEventListenerWhenClosed()
@@ -112,7 +113,7 @@ func (s *Session) Listen(ctx context.Context, events ...string) error {
 	return s.el.listen(events)
 }
 
-func (s *Session) maybeCreateEventListener(ctx context.Context) error {
+func (s *Session) maybeCreateEventListener(ctx context.Context, conn net.Conn) error {
 	s.emux.Lock()
 	defer s.emux.Unlock()
 
@@ -120,7 +121,7 @@ func (s *Session) maybeCreateEventListener(ctx context.Context) error {
 		return errEventListenerExists
 	}
 
-	elt, err := newTransport(nil)
+	elt, err := newTransport(conn)
 	if err != nil {
 		return err
 	}
