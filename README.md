@@ -28,6 +28,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/strongswan/govici"
 )
 
@@ -37,6 +38,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+        defer session.Close()
 
 	m, err := session.CommandRequest("version", nil)
 	if err != nil {
@@ -59,6 +61,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/strongswan/govici"
 )
 
@@ -68,6 +71,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+        defer session.Close()
 
 	m, err := session.CommandRequest("get-conns", nil)
 	if err != nil {
@@ -96,6 +100,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/strongswan/govici"
 )
 
@@ -105,6 +110,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+        defer session.Close()
 
 	m := vici.NewMessage()
 	err = m.Set("child", "child_sa_name")
@@ -145,6 +151,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/strongswan/govici"
 )
 
@@ -162,6 +169,7 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+        defer session.Close()
 
 	initOpts := initiateOptions{}
 
@@ -192,13 +200,15 @@ func main() {
 
 ### Event Listener
 
-This example shows a session that registers for `"ike-updown"` and `"child-updown"` events. `Listen` does not return unless the event channel is closed, so it should be run in another goroutine. Events received by the listener are given by `NextEvent`. If there is no event in the buffer at the time  `NextEvent` is called, it will block until an event is received.
+This example shows a session that registers for `"ike-updown"` and `"child-updown"` events. `Listen` will register a listener for the given events, as long as the session does not already have an event listener. A `context.Context` can be provided to cancel the event listener at any time. Otherwise, the event listener will run until the session is closed, or an unrecoverable error occurs. Events received by the listener are given by `NextEvent`. If there is no event in the buffer at the time  `NextEvent` is called, it will block until an event is received or the event listener is closed.
 
 ```go
 package main
 
 import (
 	"fmt"
+        "context"
+
 	"github.com/strongswan/govici"
 )
 
@@ -208,18 +218,34 @@ func main() {
 		fmt.Println(err)
 		return
 	}
+        defer session.Close()
 
-	events := []string{"ike-updown", "child-updown"}
-	go session.Listen(events)
+        ctx, cancel := context.WithCancel(context.Background())
+	err = session.Listen(ctx, "ike-updown", "child-updown")
+        if err != nil {
+                fmt.Println(err)
+                return
+        }
 
 	for {
+                // Wait for first up event, then stop listening
+                // for events.
 		m, err := session.NextEvent()
 		if err != nil {
-			fmt.Print(err)
+			fmt.Println(err)
 			continue
 		}
 
-		fmt.Println(m)
+                if m.Get("up") != "yes" {
+                        continue
+                }
+
+                for _, key := range m.Keys() {
+                        fmt.Printf("%v: %v\n", key, m.Get(key))                    
+                }
+                cancel()
+                
+                break
 	}
 }
 ```

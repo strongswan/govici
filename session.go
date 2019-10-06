@@ -27,7 +27,16 @@
 package vici
 
 import (
+	"context"
+	"errors"
+	"net"
 	"sync"
+)
+
+var (
+	// Event listener errors
+	errNoEventListener     = errors.New("vici: event listener is not active")
+	errEventListenerExists = errors.New("vici: event listener already exists")
 )
 
 // Session is a vici client session.
@@ -41,7 +50,11 @@ type Session struct {
 	mux sync.Mutex
 	ctr *transport
 
-	el *eventListener
+	// Allow many readers, i.e. NextEvent callers, to try to read from
+	// event listener. Writer lock is for creation and destruction of
+	// the event listener.
+	emux sync.RWMutex
+	el   *eventListener
 }
 
 // NewSession returns a new vici session.
@@ -50,17 +63,25 @@ func NewSession() (*Session, error) {
 	if err != nil {
 		return nil, err
 	}
-	elt, err := newTransport(nil)
-	if err != nil {
-		return nil, err
-	}
 
 	s := &Session{
 		ctr: ctr,
-		el:  newEventListener(elt),
 	}
 
 	return s, nil
+}
+
+// Close closes the vici session.
+func (s *Session) Close() error {
+	if err := s.el.Close(); err != nil {
+		return err
+	}
+
+	if err := s.ctr.conn.Close(); err != nil {
+		return err
+	}
+
+	return nil
 }
 
 // CommandRequest sends a command request to the server, and returns the server's response.
@@ -79,16 +100,57 @@ func (s *Session) StreamedCommandRequest(cmd string, event string, msg *Message)
 	return s.sendStreamedRequest(cmd, event, msg)
 }
 
-// Listen registers the session to listen for all events given. Listen does not return
-// unless the event channel is closed. To receive events that are registered here, use
-// NextEvent. Listen should not be called again until the previous call has returned.
-func (s *Session) Listen(events []string) error {
-	return s.el.safeListen(events)
+// Listen registers the session to listen for all events given. Listen returns when the
+// event channel is closed, or the given context is cancelled. To receive events that
+// are registered here, use NextEvent. An error is returned if Listen is called while
+// Session already has an event listener registered.
+func (s *Session) Listen(ctx context.Context, events ...string) error {
+	if err := s.maybeCreateEventListener(ctx, nil); err != nil {
+		return err
+	}
+	defer s.destroyEventListenerWhenClosed()
+
+	return s.el.listen(events)
+}
+
+func (s *Session) maybeCreateEventListener(ctx context.Context, conn net.Conn) error {
+	s.emux.Lock()
+	defer s.emux.Unlock()
+
+	if s.el != nil {
+		return errEventListenerExists
+	}
+
+	elt, err := newTransport(conn)
+	if err != nil {
+		return err
+	}
+	s.el = newEventListener(ctx, elt)
+
+	return nil
+}
+
+func (s *Session) destroyEventListenerWhenClosed() {
+	go func() {
+		<-s.el.Done()
+
+		s.emux.Lock()
+		defer s.emux.Unlock()
+
+		s.el = nil
+	}()
 }
 
 // NextEvent returns the next event received by the session event listener.  NextEvent is a
 // blocking call. If there is no event in the event buffer, NextEvent will wait to return until
 // a new event is received. An error is returned if the event channel is closed.
 func (s *Session) NextEvent() (*Message, error) {
+	s.emux.RLock()
+	defer s.emux.RUnlock()
+
+	if s.el == nil {
+		return nil, errNoEventListener
+	}
+
 	return s.el.nextEvent()
 }

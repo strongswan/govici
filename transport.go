@@ -96,6 +96,9 @@ func (t *transport) recv() (*packet, error) {
 
 	_, err := t.conn.Read(buf)
 	if err != nil {
+		if ne, ok := err.(net.Error); ok && ne.Timeout() {
+			return nil, ne
+		}
 		return nil, fmt.Errorf("%v: %v", errTransport, err)
 	}
 	pl := binary.BigEndian.Uint32(buf)

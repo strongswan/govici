@@ -161,7 +161,10 @@ func (m *Message) Get(key string) interface{} {
 
 // Keys returns the list of valid message keys.
 func (m *Message) Keys() []string {
-	return m.keys
+	keys := make([]string, len(m.keys))
+	copy(keys, m.keys)
+
+	return keys
 }
 
 // Err examines a command response Message, and determines if it was successful.
