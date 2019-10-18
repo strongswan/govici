@@ -166,3 +166,19 @@ func TestListenAndCloseSession(t *testing.T) {
 		t.Fatalf("Expected error after closing listener, got message: %v", m)
 	}
 }
+
+func TestSessionClose(t *testing.T) {
+	// Create a session without connecting to charon
+	conn, _ := net.Pipe()
+
+	s := &Session{
+		ctr: &transport{conn: conn},
+		// Event listener is not initialized,
+		// as this is done when Listen is called.
+		el: nil,
+	}
+
+	if err := s.Close(); err != nil {
+		t.Fatalf("Unpexected error when closing Session: %v", err)
+	}
+}

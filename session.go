@@ -73,8 +73,11 @@ func NewSession() (*Session, error) {
 
 // Close closes the vici session.
 func (s *Session) Close() error {
-	if err := s.el.Close(); err != nil {
-		return err
+	// Check if event listener exists before closing.
+	if s.el != nil {
+		if err := s.el.Close(); err != nil {
+			return err
+		}
 	}
 
 	if err := s.ctr.conn.Close(); err != nil {
