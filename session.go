@@ -88,11 +88,17 @@ func (s *Session) Close() error {
 }
 
 // CommandRequest sends a command request to the server, and returns the server's response.
-// The command is specified by cmd, and its arguments are provided by msg. An error is returned
-// if an error occurs while communicating with the daemon. To determine if a command was successful,
-// use Message.CheckError.
+// The command is specified by cmd, and its arguments are provided by msg. If there is an
+// error communicating with the daemon, a nil Message and non-nil error are returned. If
+// the command fails, the response Message is returned along with the error returned by
+// Message.Err.
 func (s *Session) CommandRequest(cmd string, msg *Message) (*Message, error) {
-	return s.sendRequest(cmd, msg)
+	resp, err := s.sendRequest(cmd, msg)
+	if err != nil {
+		return nil, err
+	}
+
+	return resp, resp.Err()
 }
 
 // StreamedCommandRequest sends a streamed command request to the server. StreamedCommandRequest
