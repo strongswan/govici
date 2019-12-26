@@ -96,12 +96,17 @@ func (ms *MessageStream) Messages() []*Message {
 	return ms.messages
 }
 
-// Message represents a vici message.
+// Message represents a vici message as described in the vici README:
 //
-// A Message ensures that elements are encoded in the order they are
-// added to the message, through the usage of Set. Valid message elements
-// are key-value pairs, lists, and sections which correspond to the Go types
-// string, []string, and *Message respectively.
+//     https://www.strongswan.org/apidoc/md_src_libcharon_plugins_vici_README.html
+//
+// A message supports encoding key-value pairs, lists, and sub-sections (or sub-messages).
+// Within a Message, each value, list, and sub-section is keyed by a string.
+//
+// The value in a key-value pair is represented by a string, lists are represented by a string slice,
+// and sub-sections are represented by *Message. When constructing a Message, other types may be used
+// for convenience, and may have rules on how they are converted to an appropriate internal message
+// element type. See Message.Set and MarshalMessage for details.
 type Message struct {
 	keys []string
 
@@ -116,11 +121,14 @@ func NewMessage() *Message {
 	}
 }
 
-// MarshalMessage returns a Message marshaled from a map or struct (or struct pointer).
-// When marshaling a struct, only exported fields with a `vici` tag explicitly
-// set are marshaled.
-// An error is returned if the underlying type of v cannot be marshaled, or an
-// unsupported Message element type is encountered.
+// MarshalMessage returns a Message encoded from v. The type of v must be either a map,
+// struct, or struct pointer.
+//
+// If v is a map, the map's key type must be a string, and the type of the corresponding map element
+// must be supported by Message.Set or MarshalMessage itself. If v is a struct or points to one, fields
+// are only marshaled if they are exported and explicitly have a vici struct tag set. In these cases,
+// the struct tag defines the key used for that field in the Message, and the field type must be supported
+// by Message.Set or MarshalMessage itself.
 func MarshalMessage(v interface{}) (*Message, error) {
 	m := NewMessage()
 	if err := m.marshal(v); err != nil {
@@ -131,16 +139,28 @@ func MarshalMessage(v interface{}) (*Message, error) {
 }
 
 // UnmarshalMessage unmarshals m to a map or struct (or struct pointer).
-// When unmarshaling to a struct, only exported fields with a `vici` tag explicitly
-// set are unmarshaled.
+// When unmarshaling to a struct, only exported fields with a vici struct tag
+// explicitly set are unmarshaled.
+//
 // An error is returned if the underlying value of v cannot be unmarshaled into, or
 // an unsupported type is encountered.
 func UnmarshalMessage(m *Message, v interface{}) error {
 	return m.unmarshal(v)
 }
 
-// Set sets key to value. An error is returned if value's underlying
-// type is not supported as a Message element type.
+// Set sets key to value. An error is returned if the underlying type of
+// v is not supported.
+//
+// If the type of v is supported, it is represented in the message as either a
+// string, []string, or *Message. The currently supported types are:
+//
+//  - string
+//  - integer types (converted to string)
+//  - bool (where true and false are converted to the strings "yes" and "no", respectively)
+//  - []string
+//  - *Message
+//  - map (the map must be valid as per MarshalMessage)
+//  - struct (the struct must be valid as per MarshalMessage)
 //
 // If the key already exists the value is overwritten, but the ordering
 // of the message is not changed.
@@ -148,8 +168,11 @@ func (m *Message) Set(key string, value interface{}) error {
 	return m.marshalField(key, reflect.ValueOf(value))
 }
 
-// Get returns the message field identified by key, if it exists. If the
-// field does not exist, nil is returned.
+// Get returns the value of the field identified by key, if it exists. If
+// the field does not exist, nil is returned.
+//
+// The value returned by Get is the internal message representation of that
+// field, which means the type is either string, []string, or *Message.
 func (m *Message) Get(key string) interface{} {
 	v, ok := m.data[key]
 	if !ok {
