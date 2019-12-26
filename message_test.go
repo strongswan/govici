@@ -22,6 +22,7 @@ package vici
 
 import (
 	"bytes"
+	"fmt"
 	"reflect"
 	"sort"
 	"testing"
@@ -161,6 +162,96 @@ func TestMessageDecode(t *testing.T) {
 	if !reflect.DeepEqual(m.data, goldMessage.data) {
 		t.Errorf("Decoded message does not equal gold message.\nExpected: %v\nReceived: %v", goldMessage.data, m.data)
 	}
+}
+
+func ExampleMarshalMessage() {
+	type child struct {
+		LocalTrafficSelectors []string `vici:"local_ts"`
+		UpdownScript          string   `vici:"updown"`
+		ESPProposals          []string `vici:"esp_proposals"`
+	}
+
+	type conn struct {
+		LocalAddrs   []string               `vici:"local_addrs"`
+		Local        map[string]interface{} `vici:"local"`
+		Remote       map[string]interface{} `vici:"remote"`
+		Children     map[string]child       `vici:"children"`
+		IKEVersion   uint                   `vici:"version"`
+		IKEProposals []string               `vici:"proposals"`
+	}
+
+	// Create a Message that represents the 'rw' connection from this swanctl.conf:
+	// https://www.strongswan.org/testing/testresults/swanctl/rw-cert/moon.swanctl.conf
+	rw := &conn{
+		LocalAddrs: []string{"192.168.0.1"},
+		Local: map[string]interface{}{
+			"auth":  "pubkey",
+			"certs": []string{"moonCert.pem"},
+			"id":    "moon.strongswan.org",
+		},
+		Remote: map[string]interface{}{
+			"auth": "pubkey",
+		},
+		Children: map[string]child{
+			"net": {
+				LocalTrafficSelectors: []string{"10.1.0.0/16"},
+				UpdownScript:          "/usr/local/libexec/ipsec/_updown iptables",
+				ESPProposals:          []string{"aes128gcm128-x25519"},
+			},
+		},
+		IKEVersion:   2,
+		IKEProposals: []string{"aes128-sha256-x25519"},
+	}
+
+	m, err := MarshalMessage(rw)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println(m.Get("proposals"))
+
+	net := m.Get("children").(*Message).Get("net").(*Message)
+	for _, k := range net.Keys() {
+		fmt.Printf("%s: %s\n", k, net.Get(k))
+	}
+	// Output: [aes128-sha256-x25519]
+	// local_ts: [10.1.0.0/16]
+	// updown: /usr/local/libexec/ipsec/_updown iptables
+	// esp_proposals: [aes128gcm128-x25519]
+}
+
+func ExampleUnmarshalMessage() {
+	type child struct {
+		LocalTrafficSelectors []string `vici:"local_ts"`
+		UpdownScript          string   `vici:"updown"`
+		ESPProposals          []string `vici:"esp_proposals"`
+	}
+
+	m := NewMessage()
+
+	if err := m.Set("local_ts", []string{"10.1.0.0/16"}); err != nil {
+		fmt.Println(err)
+		return
+	}
+	if err := m.Set("esp_proposals", []string{"aes128gcm128-x25519"}); err != nil {
+		fmt.Println(err)
+		return
+	}
+	if err := m.Set("updown", "/usr/local/libexec/ipsec/_updown iptables"); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	var c child
+
+	if err := UnmarshalMessage(m, &c); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Printf("%+v\n", c)
+	// Output: {LocalTrafficSelectors:[10.1.0.0/16] UpdownScript:/usr/local/libexec/ipsec/_updown iptables ESPProposals:[aes128gcm128-x25519]}
 }
 
 func TestMarshalMessage(t *testing.T) {
@@ -441,4 +532,26 @@ func TestMessageUniqueKeys(t *testing.T) {
 	if len(indices) != 1 {
 		t.Fatalf("Expected unique message keys: found %v instances of 'key1'", len(indices))
 	}
+}
+
+func ExampleMessage_Set() {
+	m := NewMessage()
+
+	if err := m.Set("version", 2); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	if err := m.Set("mobike", false); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	if err := m.Set("local_addrs", []string{"192.168.0.1/24"}); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Printf("%v, %v, %v\n", m.Get("version"), m.Get("mobike"), m.Get("local_addrs"))
+	// Output: 2, no, [192.168.0.1/24]
 }
