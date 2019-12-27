@@ -346,36 +346,89 @@ func TestMessageGet(t *testing.T) {
 }
 
 func TestMessageSet(t *testing.T) {
+	// Test that all supported types can be set.
+	valid := []interface{}{
+		// type: string
+		"value",
+
+		// type: []string
+		[]string{"item1", "item2"},
+
+		// type: *Message
+		NewMessage(),
+
+		// type: int
+		0,
+
+		// type: bool
+		true,
+
+		// type: map
+		map[string]interface{}{
+			"key1": "value1",
+			"key2": []string{"item1", "item2"},
+		},
+
+		// type: struct (must be valid as per MarshalMessage)
+		struct {
+			Name string `vici:"name"`
+		}{
+			Name: "value1",
+		},
+	}
+
 	m := NewMessage()
 
-	err := m.Set("key1", "value1")
-	if err != nil {
-		t.Errorf("Unexpected error setting string in message: %v", err)
+	for _, v := range valid {
+		if err := m.Set("test", v); err != nil {
+			t.Fatalf("unexpected error setting supported type '%T': %v", v, err)
+		}
+	}
+}
+
+func TestMessageSetTypeConversion(t *testing.T) {
+	type conversion struct {
+		in  interface{}
+		out interface{}
 	}
 
-	err = m.Set("list1", []string{"value1", "value2"})
-	if err != nil {
-		t.Errorf("Unexpected error setting list in message: %v", err)
+	conversions := []conversion{
+		{"string", "string"},
+		{[]string{"item1", "item2"}, []string{"item1", "item2"}},
+		{3, "3"},
+		{true, "yes"},
+		{false, "no"},
 	}
 
-	err = m.Set("section1", NewMessage())
-	if err != nil {
-		t.Errorf("Unexpected error setting sub-message in message: %v", err)
-	}
+	m := NewMessage()
 
-	err = m.Set("invalid", 0)
-	if err == nil {
-		t.Errorf("Expected a non-nil error setting unsupported message element type '%T'", 0)
+	for _, c := range conversions {
+		if err := m.Set("test", c.in); err != nil {
+			t.Fatalf("unexpected error setting supported type '%T': %v", c.in, err)
+		}
+
+		if !reflect.DeepEqual(c.out, m.Get("test")) {
+			t.Fatalf("got incorrect conversion '%T'\nexpected: %v\n got: %v", c.in, c.out, m.Get("test"))
+		}
+	}
+}
+
+func TestMessageUniqueKeys(t *testing.T) {
+	m := NewMessage()
+
+	err := m.Set("key1", "firstValue")
+	if err != nil {
+		t.Fatalf("Unexpected error setting string in message: %v", err)
 	}
 
 	// Make sure that keys are not duplicated
 	err = m.Set("key1", "newValue")
 	if err != nil {
-		t.Errorf("Unexpected error setting string in message: %v", err)
+		t.Fatalf("Unexpected error setting string in message: %v", err)
 	}
 
 	if v := m.Get("key1"); v.(string) != "newValue" {
-		t.Errorf("Expected old value of 'key1' to be overwritten: key1=%v", v)
+		t.Fatalf("Expected old value of 'key1' to be overwritten: key1=%v", v)
 	}
 
 	indices := make([]int, 0)
@@ -386,6 +439,6 @@ func TestMessageSet(t *testing.T) {
 	}
 
 	if len(indices) != 1 {
-		t.Errorf("Expected unique message keys: found %v instances of 'key1'", len(indices))
+		t.Fatalf("Expected unique message keys: found %v instances of 'key1'", len(indices))
 	}
 }

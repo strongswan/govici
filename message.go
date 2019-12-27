@@ -145,7 +145,7 @@ func UnmarshalMessage(m *Message, v interface{}) error {
 // If the key already exists the value is overwritten, but the ordering
 // of the message is not changed.
 func (m *Message) Set(key string, value interface{}) error {
-	return m.addItem(key, value)
+	return m.marshalField(key, reflect.ValueOf(value))
 }
 
 // Get returns the message field identified by key, if it exists. If the
@@ -181,30 +181,16 @@ func (m *Message) Err() error {
 }
 
 func (m *Message) addItem(key string, value interface{}) error {
-	rv := reflect.ValueOf(value)
-
 	// Check if the key is already set in the message
 	_, exists := m.data[key]
 
-	switch rv.Kind() {
-
-	case reflect.String:
-		m.data[key] = value.(string)
-
-	case reflect.Slice, reflect.Array:
-		list, ok := value.([]string)
-		if !ok {
-			return errUnsupportedType
-		}
-		m.data[key] = list
-
-	case reflect.Ptr:
-		msg, ok := value.(*Message)
-		if !ok {
-			return errUnsupportedType
-		}
-		m.data[key] = msg
-
+	switch v := value.(type) {
+	case string:
+		m.data[key] = v
+	case []string:
+		m.data[key] = v
+	case *Message:
+		m.data[key] = v
 	default:
 		return errUnsupportedType
 	}
@@ -797,7 +783,6 @@ func (m *Message) marshalFromMap(rv reflect.Value) error {
 }
 
 func (m *Message) marshalField(name string, rv reflect.Value) error {
-
 	if rv.Kind() == reflect.Interface {
 		rv = reflect.ValueOf(rv.Interface())
 	}
@@ -876,7 +861,6 @@ func (m *Message) unmarshal(v interface{}) error {
 		return fmt.Errorf("%v: cannot unmarshal into %v", errUnmarshalUnsupportedType, rv.Kind())
 
 	}
-
 }
 
 func (m *Message) unmarshalToStruct(rv reflect.Value) error {
