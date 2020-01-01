@@ -38,7 +38,7 @@ package main
 import (
         "fmt"
 
-        "github.com/strongswan/govici"
+        "github.com/strongswan/govici/vici"
 )
 
 func main() {
@@ -110,7 +110,7 @@ package main
 import (
         "fmt"
 
-        "github.com/strongswan/govici"
+        "github.com/strongswan/govici/vici"
 )
 
 func main() {
@@ -157,7 +157,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/strongswan/govici"
+	"github.com/strongswan/govici/vici"
 )
 
 func main() {
@@ -218,7 +218,7 @@ type cert struct {
 }
 ```
 
-Remember, as stated on [godoc](https://godoc.org/github.com/strongswan/govici#MarshalMessage), struct fields are only marshaled when they are exported and have a `vici` struct tag. Notice that the struct tags are identical to the field names in the `load-cert` message parameters. Now, we could wrap this all up into a helper function that loads a certificate into the daemon given its path on the filesystem.
+Remember, as stated on [godoc](https://godoc.org/github.com/strongswan/govici/vici#MarshalMessage), struct fields are only marshaled when they are exported and have a `vici` struct tag. Notice that the struct tags are identical to the field names in the `load-cert` message parameters. Now, we could wrap this all up into a helper function that loads a certificate into the daemon given its path on the filesystem.
 
 ```go
 package main
@@ -227,7 +227,7 @@ import (
 	"encoding/pem"
 	"io/ioutil"
 
-	"github.com/strongswan/govici"
+	"github.com/strongswan/govici/vici"
 )
 
 type cert struct {
@@ -354,7 +354,7 @@ Putting this all together, we can write some helpers to load our configuration i
 package main
 
 import (
-        "github.com/strongswan/govici"
+        "github.com/strongswan/govici/vici"
 )
 
 type connection struct {
