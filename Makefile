@@ -6,7 +6,7 @@ check: golint test
 
 .PHONY: test
 test:
-	go test -v ./ -count=1
+	go test -v ./vici -count=1
 
 .PHONY: golint
 golint:
