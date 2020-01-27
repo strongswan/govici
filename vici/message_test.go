@@ -407,6 +407,36 @@ func TestUnmarshalMessageToNilPointer(t *testing.T) {
 	}
 }
 
+func TestUnmarshalToNonEmpty(t *testing.T) {
+	type data struct {
+		A string `vici:"a"`
+		B string `vici:"b"`
+	}
+
+	d := data{
+		A: "testA",
+	}
+
+	want := data{
+		A: "testA",
+		B: "testB",
+	}
+
+	m := NewMessage()
+
+	if err := m.Set("b", "testB"); err != nil {
+		t.Fatalf("Unable to set message field: %v", err)
+	}
+
+	if err := UnmarshalMessage(m, &d); err != nil {
+		t.Fatalf("Unexpected error unmarshaling: %v", err)
+	}
+
+	if !reflect.DeepEqual(want, d) {
+		t.Fatalf("UnmarshalMessage did not preserve data:\nwant: %+v\ngot: %+v", want, d)
+	}
+}
+
 func TestUnmarshalMessageNestedNilPtr(t *testing.T) {
 	tm := &testMessage{
 		Message: NewMessage(),
