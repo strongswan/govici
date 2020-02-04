@@ -29,6 +29,7 @@ package vici
 import (
 	"context"
 	"errors"
+	"fmt"
 	"net"
 	"sync"
 )
@@ -55,20 +56,47 @@ type Session struct {
 	// the event listener.
 	emux sync.RWMutex
 	el   *eventListener
+
+	// Session options.
+	*sessionOpts
 }
 
 // NewSession returns a new vici session.
-func NewSession() (*Session, error) {
-	ctr, err := newTransport(nil)
+func NewSession(opts ...SessionOption) (*Session, error) {
+	s := &Session{
+		sessionOpts: &sessionOpts{},
+	}
+
+	for _, opt := range opts {
+		opt.apply(s.sessionOpts)
+	}
+
+	ctr, err := s.newTransport()
 	if err != nil {
 		return nil, err
 	}
 
-	s := &Session{
-		ctr: ctr,
-	}
+	s.ctr = ctr
 
 	return s, nil
+}
+
+// newTransport creates a transport based on the session options.
+func (s *Session) newTransport() (*transport, error) {
+	if s.path == "" {
+		s.path = defaultSocketPath
+	}
+
+	conn, err := net.Dial("unix", s.path)
+	if err != nil {
+		return nil, fmt.Errorf("%v: %v", errTransport, err)
+	}
+
+	t := &transport{
+		conn: conn,
+	}
+
+	return t, nil
 }
 
 // Close closes the vici session.
@@ -85,6 +113,38 @@ func (s *Session) Close() error {
 	}
 
 	return nil
+}
+
+// SessionOption is used to specify additional options
+// to a Session.
+type SessionOption interface {
+	apply(*sessionOpts)
+}
+
+type sessionOpts struct {
+	// Path to vici socket, defaults to /var/run/charon.vici.
+	path string
+}
+
+type funcSessionOption struct {
+	f func(*sessionOpts)
+}
+
+func (fso *funcSessionOption) apply(s *sessionOpts) {
+	fso.f(s)
+}
+
+func newFuncSessionOption(f func(*sessionOpts)) *funcSessionOption {
+	return &funcSessionOption{f}
+}
+
+// WithSocketPath specifies the path of the socket that charon
+// is listening on. If this option is not specified, the default
+// path, /var/run/charon.vici, is used.
+func WithSocketPath(path string) SessionOption {
+	return newFuncSessionOption(func(so *sessionOpts) {
+		so.path = path
+	})
 }
 
 // CommandRequest sends a command request to the server, and returns the server's response.
