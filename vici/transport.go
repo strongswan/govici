@@ -30,7 +30,7 @@ import (
 
 const (
 	// Default unix socket path
-	viciSocket = "/var/run/charon.vici"
+	defaultSocketPath = "/var/run/charon.vici"
 
 	// Each segment is prefixed by a 4-byte header in network oreder
 	headerLength = 4
@@ -49,7 +49,7 @@ func newTransport(c net.Conn) (*transport, error) {
 		return &transport{c}, nil
 	}
 
-	c, err := net.Dial("unix", viciSocket)
+	c, err := net.Dial("unix", defaultSocketPath)
 	if err != nil {
 		return nil, fmt.Errorf("%v: %v", errTransport, err)
 	}
