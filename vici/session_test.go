@@ -182,3 +182,20 @@ func TestSessionClose(t *testing.T) {
 		t.Fatalf("Unpexected error when closing Session: %v", err)
 	}
 }
+
+func TestIdempotentSessionClose(t *testing.T) {
+	conn, _ := net.Pipe()
+
+	s, err := NewSession(withTestConn(conn))
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+
+	if err := s.Close(); err != nil {
+		t.Fatalf("Unpexected error when closing Session (first close): %v", err)
+	}
+
+	if err := s.Close(); err != nil {
+		t.Fatalf("Unpexected error when closing Session (second close): %v", err)
+	}
+}
