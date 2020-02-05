@@ -88,22 +88,7 @@ func mockCharon(ctx context.Context) net.Conn {
 	return client
 }
 
-// testListen used to create a listener with a net.Pipe.
-//
-// Used for testing only.
-func (s *Session) testListen(ctx context.Context, conn net.Conn, events ...string) error {
-	if err := s.maybeCreateEventListener(ctx, conn); err != nil {
-		return err
-	}
-	defer s.destroyEventListenerWhenClosed()
-
-	return s.el.listen(events)
-}
-
 func TestListenAndCancel(t *testing.T) {
-	// No need for a command transport in this test.
-	s := &Session{}
-
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 
@@ -112,8 +97,13 @@ func TestListenAndCancel(t *testing.T) {
 
 	conn := mockCharon(dctx)
 
-	err := s.testListen(ctx, conn, "test-event")
+	s, err := NewSession(withTestConn(conn))
 	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+	defer s.Close()
+
+	if err := s.Listen(ctx, "test-event"); err != nil {
 		t.Fatalf("Failed to start event listener: %v", err)
 	}
 
@@ -140,11 +130,13 @@ func TestListenAndCloseSession(t *testing.T) {
 
 	conn := mockCharon(dctx)
 
-	s := &Session{
-		ctr: &transport{conn: conn},
+	s, err := NewSession(withTestConn(conn))
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
 	}
+	defer s.Close()
 
-	err := s.testListen(context.Background(), conn, "test-event")
+	err = s.Listen(context.Background(), "test-event")
 	if err != nil {
 		t.Fatalf("Failed to start event listener: %v", err)
 	}
@@ -171,11 +163,9 @@ func TestSessionClose(t *testing.T) {
 	// Create a session without connecting to charon
 	conn, _ := net.Pipe()
 
-	s := &Session{
-		ctr: &transport{conn: conn},
-		// Event listener is not initialized,
-		// as this is done when Listen is called.
-		el: nil,
+	s, err := NewSession(withTestConn(conn))
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
 	}
 
 	if err := s.Close(); err != nil {

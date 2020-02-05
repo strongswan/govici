@@ -83,6 +83,11 @@ func NewSession(opts ...SessionOption) (*Session, error) {
 
 // newTransport creates a transport based on the session options.
 func (s *Session) newTransport() (*transport, error) {
+	// Check if a net.Conn was supplied already (testing only).
+	if s.conn != nil {
+		return &transport{conn: s.conn}, nil
+	}
+
 	if s.path == "" {
 		s.path = defaultSocketPath
 	}
@@ -130,6 +135,11 @@ type SessionOption interface {
 type sessionOpts struct {
 	// Path to vici socket, defaults to /var/run/charon.vici.
 	path string
+
+	// A net.Conn to use, instead of dialing a unix socket.
+	//
+	// This is only used for testing purposes.
+	conn net.Conn
 }
 
 type funcSessionOption struct {
@@ -150,6 +160,14 @@ func newFuncSessionOption(f func(*sessionOpts)) *funcSessionOption {
 func WithSocketPath(path string) SessionOption {
 	return newFuncSessionOption(func(so *sessionOpts) {
 		so.path = path
+	})
+}
+
+// withTestConn is a SessionOption used in testing to supply a net.Conn
+// without actually dialing a unix socket.
+func withTestConn(conn net.Conn) SessionOption {
+	return newFuncSessionOption(func(so *sessionOpts) {
+		so.conn = conn
 	})
 }
 
@@ -180,7 +198,7 @@ func (s *Session) StreamedCommandRequest(cmd string, event string, msg *Message)
 // are registered here, use NextEvent. An error is returned if Listen is called while
 // Session already has an event listener registered.
 func (s *Session) Listen(ctx context.Context, events ...string) error {
-	if err := s.maybeCreateEventListener(ctx, nil); err != nil {
+	if err := s.maybeCreateEventListener(ctx); err != nil {
 		return err
 	}
 	defer s.destroyEventListenerWhenClosed()
@@ -188,7 +206,7 @@ func (s *Session) Listen(ctx context.Context, events ...string) error {
 	return s.el.listen(events)
 }
 
-func (s *Session) maybeCreateEventListener(ctx context.Context, conn net.Conn) error {
+func (s *Session) maybeCreateEventListener(ctx context.Context) error {
 	s.emux.Lock()
 	defer s.emux.Unlock()
 
@@ -196,7 +214,7 @@ func (s *Session) maybeCreateEventListener(ctx context.Context, conn net.Conn) e
 		return errEventListenerExists
 	}
 
-	elt, err := newTransport(conn)
+	elt, err := s.newTransport()
 	if err != nil {
 		return err
 	}
