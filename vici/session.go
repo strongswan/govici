@@ -106,10 +106,16 @@ func (s *Session) Close() error {
 		if err := s.el.Close(); err != nil {
 			return err
 		}
+
+		s.el = nil
 	}
 
-	if err := s.ctr.conn.Close(); err != nil {
-		return err
+	if s.ctr != nil {
+		if err := s.ctr.conn.Close(); err != nil {
+			return err
+		}
+
+		s.ctr = nil
 	}
 
 	return nil
