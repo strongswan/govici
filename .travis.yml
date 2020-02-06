@@ -1,6 +1,16 @@
 language: go
 
-before_install:
-  - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.16.0
+dist: bionic
 
-script: make check
+jobs:
+    include:
+        - stage: lint
+          before_install:
+            - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.16.0
+          script: make golint
+        - stage: test
+          install: sudo apt install strongswan-charon strongswan-swanctl -y
+          before_script:
+            - sudo systemctl start strongswan
+            - sudo systemctl status strongswan
+          script: sudo -E env "PATH=$PATH"  TEST_FLAGS=-integration make test

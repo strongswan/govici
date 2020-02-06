@@ -22,6 +22,7 @@ package vici
 
 import (
 	"context"
+	"flag"
 	"log"
 	"net"
 	"testing"
@@ -187,5 +188,70 @@ func TestIdempotentSessionClose(t *testing.T) {
 
 	if err := s.Close(); err != nil {
 		t.Fatalf("Unpexected error when closing Session (second close): %v", err)
+	}
+}
+
+// These tests are considered 'integration' tests because they require charon
+// to be running, and make actual client-issued commands. Note that these are
+// only meant to test the package API, and the specific commands used are out
+// of convenience; any command that satisfies the need of the test could be used.
+//
+// For example, TestStreamedCommandRequest uses the 'list-authorities' command, but
+// any event-streaming vici command could be used.
+//
+// These tests are only run when the -integration flag is set to true.
+var (
+	doIntegrationTests = flag.Bool("integration", false, "Run integration tests that require charon")
+)
+
+func maybeSkipIntegrationTest(t *testing.T) {
+	if !*doIntegrationTests {
+		t.Skip("Skipping integration test.")
+	}
+}
+
+// TestCommandRequest tests CommandRequest by calling the 'version' command.
+// For good measure, check the response and make sure the 'daemon' field is
+// set to 'charon.'
+func TestCommandRequest(t *testing.T) {
+	maybeSkipIntegrationTest(t)
+
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("Failed to create a session: %v", err)
+	}
+	defer s.Close()
+
+	resp, err := s.CommandRequest("version", nil)
+	if err != nil {
+		t.Fatalf("Failed to get charon version information: %v", err)
+	}
+
+	if d := resp.Get("daemon"); d != "charon" {
+		t.Fatalf("Got unexpected value for 'daemon' (%s)", d)
+	}
+}
+
+// TestStreamedCommandRequest tests StreamedCommandRequest by calling the
+// 'list-authorities' command. Likely, there will be no authorities returned,
+// but make sure any Messages that are streamed have non-nil err.
+func TestStreamedCommandRequest(t *testing.T) {
+	maybeSkipIntegrationTest(t)
+
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("Failed to create a session: %v", err)
+	}
+	defer s.Close()
+
+	ms, err := s.StreamedCommandRequest("list-authorities", "list-authority", nil)
+	if err != nil {
+		t.Fatalf("Failed to list authorities: %v", err)
+	}
+
+	for i, m := range ms.Messages() {
+		if m.Err() != nil {
+			t.Fatalf("Got error in message #%d: %v", i+1, m.Err())
+		}
 	}
 }
