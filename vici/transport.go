@@ -44,19 +44,6 @@ var (
 	errTransport = errors.New("vici: transport error")
 )
 
-func newTransport(c net.Conn) (*transport, error) {
-	if c != nil {
-		return &transport{c}, nil
-	}
-
-	c, err := net.Dial("unix", defaultSocketPath)
-	if err != nil {
-		return nil, fmt.Errorf("%v: %v", errTransport, err)
-	}
-
-	return &transport{c}, nil
-}
-
 type transport struct {
 	conn net.Conn
 }
