@@ -261,13 +261,14 @@ func (m *Message) encode() ([]byte, error) {
 		)
 
 		switch rv.Kind() {
-
+		// In these cases, the variable 'uv' is short for
+		// 'underlying value.'
 		case reflect.String:
 			uv := v.(string)
 
 			data, err = m.encodeKeyValue(k, uv)
 			if err != nil {
-				return []byte{}, err
+				return nil, err
 			}
 
 		case reflect.Slice, reflect.Array:
@@ -275,27 +276,27 @@ func (m *Message) encode() ([]byte, error) {
 
 			data, err = m.encodeList(k, uv)
 			if err != nil {
-				return []byte{}, err
+				return nil, err
 			}
 
 		case reflect.Ptr:
 			uv, ok := v.(*Message)
 			if !ok {
-				return []byte{}, errUnsupportedType
+				return nil, errUnsupportedType
 			}
 
 			data, err = m.encodeSection(k, uv)
 			if err != nil {
-				return []byte{}, err
+				return nil, err
 			}
 
 		default:
-			return []byte{}, errUnsupportedType
+			return nil, errUnsupportedType
 		}
 
 		_, err = buf.Write(data)
 		if err != nil {
-			return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
+			return nil, fmt.Errorf("%v: %v", errEncoding, err)
 		}
 	}
 
@@ -358,12 +359,12 @@ func (m *Message) encodeKeyValue(key, value string) ([]byte, error) {
 	// Write the key length and key
 	err := buf.WriteByte(uint8(len(key)))
 	if err != nil {
-		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
+		return nil, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	_, err = buf.WriteString(key)
 	if err != nil {
-		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
+		return nil, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	// Write the value's length to the buffer as two bytes
@@ -372,13 +373,13 @@ func (m *Message) encodeKeyValue(key, value string) ([]byte, error) {
 
 	_, err = buf.Write(vl)
 	if err != nil {
-		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
+		return nil, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	// Write the value to the buffer
 	_, err = buf.WriteString(value)
 	if err != nil {
-		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
+		return nil, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	return buf.Bytes(), nil
@@ -398,19 +399,19 @@ func (m *Message) encodeList(key string, list []string) ([]byte, error) {
 	// Write the key length and key
 	err := buf.WriteByte(uint8(len(key)))
 	if err != nil {
-		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
+		return nil, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	_, err = buf.WriteString(key)
 	if err != nil {
-		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
+		return nil, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	for _, item := range list {
 		// Indicate that this is a list item
 		err = buf.WriteByte(msgListItem)
 		if err != nil {
-			return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
+			return nil, fmt.Errorf("%v: %v", errEncoding, err)
 		}
 
 		// Write the item's length to the buffer as two bytes
@@ -419,20 +420,20 @@ func (m *Message) encodeList(key string, list []string) ([]byte, error) {
 
 		_, err = buf.Write(il)
 		if err != nil {
-			return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
+			return nil, fmt.Errorf("%v: %v", errEncoding, err)
 		}
 
 		// Write the item to the buffer
 		_, err = buf.WriteString(item)
 		if err != nil {
-			return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
+			return nil, fmt.Errorf("%v: %v", errEncoding, err)
 		}
 	}
 
 	// Indicate the end of the list
 	err = buf.WriteByte(msgListEnd)
 	if err != nil {
-		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
+		return nil, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	return buf.Bytes(), nil
@@ -447,12 +448,12 @@ func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
 	// Write the key length and key
 	err := buf.WriteByte(uint8(len(key)))
 	if err != nil {
-		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
+		return nil, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	_, err = buf.WriteString(key)
 	if err != nil {
-		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
+		return nil, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	// Encode the sections elements
@@ -471,7 +472,7 @@ func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
 
 			data, err = m.encodeKeyValue(k, uv)
 			if err != nil {
-				return []byte{}, err
+				return nil, err
 			}
 
 		case reflect.Slice, reflect.Array:
@@ -479,27 +480,27 @@ func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
 
 			data, err = m.encodeList(k, uv)
 			if err != nil {
-				return []byte{}, err
+				return nil, err
 			}
 
 		case reflect.Ptr:
 			uv, ok := v.(*Message)
 			if !ok {
-				return []byte{}, errUnsupportedType
+				return nil, errUnsupportedType
 			}
 
 			data, err = m.encodeSection(k, uv)
 			if err != nil {
-				return []byte{}, err
+				return nil, err
 			}
 
 		default:
-			return []byte{}, errUnsupportedType
+			return nil, errUnsupportedType
 		}
 
 		_, err = buf.Write(data)
 		if err != nil {
-			return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
+			return nil, fmt.Errorf("%v: %v", errEncoding, err)
 		}
 
 	}
@@ -507,7 +508,7 @@ func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
 	// Indicate the end of the section
 	err = buf.WriteByte(msgSectionEnd)
 	if err != nil {
-		return []byte{}, fmt.Errorf("%v: %v", errEncoding, err)
+		return nil, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	return buf.Bytes(), nil
@@ -549,8 +550,10 @@ func (m *Message) decodeKeyValue(data []byte) (int, error) {
 		return -1, fmt.Errorf("%v: %v", errDecoding, err)
 	}
 
-	// Return the length of the key and value, plus the three bytes for their
-	// lengths
+	// Return the total number of bytes read. Specifically,
+	// we have 1 byte for the key length, n (keyLen) bytes
+	// for the key itself, 2 bytes for the value length, and
+	// k (valueLen) bytes for the value itself.
 	return keyLen + valueLen + 3, nil
 }
 
@@ -578,7 +581,11 @@ func (m *Message) decodeList(data []byte) (int, error) {
 		return -1, fmt.Errorf("%v: %v", errDecoding, err)
 	}
 
-	// Keep track of bytes decoded
+	// Start a counter to keep track of bytes decoded.
+	//
+	// So far, we've read one byte for the key length,
+	// n (keyLen) bytes for the key itself, and one byte
+	// to start the first list item.
 	count := keyLen + 2
 
 	// Read the list from the buffer
@@ -609,6 +616,10 @@ func (m *Message) decodeList(data []byte) (int, error) {
 			return -1, fmt.Errorf("%v: %v", errDecoding, err)
 		}
 
+		// In this iteration, we've read 2 bytes to get the
+		// length of the list item, n (valueLen) bytes for
+		// the value itself, and one more byte to either
+		// (a) start the next list item, or (b) end the list.
 		count += valueLen + 3
 	}
 
@@ -718,9 +729,7 @@ func newMessageTag(tag reflect.StructTag) messageTag {
 }
 
 func emptyMessageElement(rv reflect.Value) bool {
-
 	switch rv.Kind() {
-
 	case reflect.Slice:
 		return rv.IsNil()
 
@@ -736,7 +745,6 @@ func emptyMessageElement(rv reflect.Value) bool {
 
 	case reflect.Map:
 		return rv.IsNil() || len(rv.MapKeys()) == 0
-
 	}
 
 	return false
@@ -759,7 +767,6 @@ func (m *Message) marshal(v interface{}) error {
 	default:
 		return fmt.Errorf("%v: %v", errMarshalUnsupportedType, rv.Kind())
 	}
-
 }
 
 func (m *Message) marshalFromStruct(rv reflect.Value) error {
@@ -913,7 +920,6 @@ func (m *Message) unmarshalToStruct(rv reflect.Value) error {
 }
 
 func (m *Message) unmarshalToMap(rv reflect.Value) error {
-
 	if rv.Type().Key().Kind() != reflect.String {
 		return fmt.Errorf("%v: map keys of type %v are not compatible with string", errUnmarshalTypeMismatch, rv.Type().Key().Kind())
 	}
