@@ -144,11 +144,11 @@ type testSection struct {
 func TestMessageEncode(t *testing.T) {
 	b, err := goldMessage.encode()
 	if err != nil {
-		t.Errorf("Error encoding test message: %v", err)
+		t.Fatalf("Error encoding test message: %v", err)
 	}
 
 	if !bytes.Equal(b, goldMessageBytes) {
-		t.Errorf("Encoded message does not equal gold bytes.\nExpected: %v\nReceived: %v", goldMessageBytes, b)
+		t.Fatalf("Encoded message does not equal gold bytes.\nExpected: %v\nReceived: %v", goldMessageBytes, b)
 	}
 }
 
@@ -156,11 +156,11 @@ func TestMessageDecode(t *testing.T) {
 	m := NewMessage()
 	err := m.decode(goldMessageBytes)
 	if err != nil {
-		t.Errorf("Error decoding test bytes: %v", err)
+		t.Fatalf("Error decoding test bytes: %v", err)
 	}
 
 	if !reflect.DeepEqual(m.data, goldMessage.data) {
-		t.Errorf("Decoded message does not equal gold message.\nExpected: %v\nReceived: %v", goldMessage.data, m.data)
+		t.Fatalf("Decoded message does not equal gold message.\nExpected: %v\nReceived: %v", goldMessage.data, m.data)
 	}
 }
 
@@ -257,18 +257,18 @@ func ExampleUnmarshalMessage() {
 func TestMarshalMessage(t *testing.T) {
 	m, err := MarshalMessage(goldUnmarshaled)
 	if err != nil {
-		t.Errorf("Unexpected error marshaling: %v", err)
+		t.Fatalf("Unexpected error marshaling: %v", err)
 	}
 
 	if !reflect.DeepEqual(m, goldMarshaled) {
-		t.Errorf("Marshaled message does not equal gold marshaled message.\nExpected: %v\nReceived: %v", goldMarshaled, m)
+		t.Fatalf("Marshaled message does not equal gold marshaled message.\nExpected: %v\nReceived: %v", goldMarshaled, m)
 	}
 }
 
 func TestMarshalMessageMap(t *testing.T) {
 	m, err := MarshalMessage(goldUnmarshaledMap)
 	if err != nil {
-		t.Errorf("Unexpected error marshaling: %v", err)
+		t.Fatalf("Unexpected error marshaling: %v", err)
 	}
 
 	// Map keys are unordered, so we need to compare differently
@@ -278,11 +278,11 @@ func TestMarshalMessageMap(t *testing.T) {
 	sort.Strings(marshaledKeys)
 
 	if !reflect.DeepEqual(m.keys, marshaledKeys) {
-		t.Errorf("Marshaled message does not equal gold marshaled message keys.\nExpected: %v\nReceived: %v", marshaledKeys, m.data)
+		t.Fatalf("Marshaled message does not equal gold marshaled message keys.\nExpected: %v\nReceived: %v", marshaledKeys, m.data)
 	}
 
 	if !reflect.DeepEqual(m.data, goldMarshaled.data) {
-		t.Errorf("Marshaled message does not equal gold marshaled message data.\nExpected: %v\nReceived: %v", goldMarshaled.data, m.data)
+		t.Fatalf("Marshaled message does not equal gold marshaled message data.\nExpected: %v\nReceived: %v", goldMarshaled.data, m.data)
 	}
 }
 
@@ -294,11 +294,11 @@ func TestUnmarshalMessage(t *testing.T) {
 
 	err := UnmarshalMessage(goldMarshaled, tm)
 	if err != nil {
-		t.Errorf("Unexpected error unmarshaling: %v", err)
+		t.Fatalf("Unexpected error unmarshaling: %v", err)
 	}
 
 	if !reflect.DeepEqual(*tm, goldUnmarshaled) {
-		t.Errorf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", goldUnmarshaled, *tm)
+		t.Fatalf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", goldUnmarshaled, *tm)
 	}
 }
 
@@ -324,7 +324,7 @@ func TestUnmarshalMessageMapSimple(t *testing.T) {
 		t.Fatalf("Unmarshaled message does not contain 'one'")
 	}
 	if one != "1" {
-		t.Errorf("Value of 'one' is incorrect.\nExpected: 1\nReceived: %s", one)
+		t.Fatalf("Value of 'one' is incorrect.\nExpected: 1\nReceived: %s", one)
 	}
 
 	two, ok := tm["two"]
@@ -332,7 +332,7 @@ func TestUnmarshalMessageMapSimple(t *testing.T) {
 		t.Fatalf("Unmarshaled message does not contain 'two'")
 	}
 	if two != "2" {
-		t.Errorf("Value of 'two' is incorrect.\nExpected: 2\nReceived: %s", two)
+		t.Fatalf("Value of 'two' is incorrect.\nExpected: 2\nReceived: %s", two)
 	}
 
 }
@@ -354,11 +354,11 @@ func TestUnmarshalMessageMapPointers(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(tm["section1"], &goldUnmarshaled.Section1) {
-		t.Errorf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", &goldUnmarshaled.Section1, tm["section1"])
+		t.Fatalf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", &goldUnmarshaled.Section1, tm["section1"])
 	}
 
 	if !reflect.DeepEqual(tm["section2"], goldUnmarshaled.Section2) {
-		t.Errorf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", goldUnmarshaled.Section2, tm["section2"])
+		t.Fatalf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", goldUnmarshaled.Section2, tm["section2"])
 	}
 }
 
@@ -378,11 +378,11 @@ func TestUnmarshalMessageMapNotPointers(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(tm["section1"], goldUnmarshaled.Section1) {
-		t.Errorf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", goldUnmarshaled.Section1, tm["section1"])
+		t.Fatalf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", goldUnmarshaled.Section1, tm["section1"])
 	}
 
 	if !reflect.DeepEqual(tm["section2"], *goldUnmarshaled.Section2) {
-		t.Errorf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", *goldUnmarshaled.Section2, tm["section2"])
+		t.Fatalf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", *goldUnmarshaled.Section2, tm["section2"])
 	}
 }
 
@@ -394,7 +394,7 @@ func TestUnmarshalMessageNotPointer(t *testing.T) {
 
 	err := UnmarshalMessage(goldMarshaled, tm)
 	if err == nil {
-		t.Errorf("Expected error when unmarshaling to non-pointer struct")
+		t.Fatalf("Expected error when unmarshaling to non-pointer struct")
 	}
 }
 
@@ -403,7 +403,7 @@ func TestUnmarshalMessageToNilPointer(t *testing.T) {
 
 	err := UnmarshalMessage(goldMarshaled, tm)
 	if err == nil {
-		t.Errorf("Expected error when unmarshaling to nil pointer")
+		t.Fatalf("Expected error when unmarshaling to nil pointer")
 	}
 }
 
@@ -444,25 +444,25 @@ func TestUnmarshalMessageNestedNilPtr(t *testing.T) {
 
 	err := UnmarshalMessage(goldMarshaled, tm)
 	if err != nil {
-		t.Errorf("Unexpected error unmarshaling: %v", err)
+		t.Fatalf("Unexpected error unmarshaling: %v", err)
 	}
 
 	if !reflect.DeepEqual(*tm, goldUnmarshaled) {
-		t.Errorf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", goldUnmarshaled, *tm)
+		t.Fatalf("Unmarshaled message does not equal gold struct.\nExpected: %+v\nReceived: %+v", goldUnmarshaled, *tm)
 	}
 }
 
 func TestMessageGet(t *testing.T) {
 	v := goldMessage.Get("key1")
 	if value, ok := v.(string); !ok {
-		t.Errorf("Expected %v to be string: received %T", value, value)
+		t.Fatalf("Expected %v to be string: received %T", value, value)
 	} else if value != "value1" {
-		t.Errorf("Expected 'key1' to be 'value1': received %v", value)
+		t.Fatalf("Expected 'key1' to be 'value1': received %v", value)
 	}
 
 	v = goldMessage.Get("invalid")
 	if v != nil {
-		t.Errorf("Expected nil for Get on non-existent key: received %v", v)
+		t.Fatalf("Expected nil for Get on non-existent key: received %v", v)
 	}
 }
 
