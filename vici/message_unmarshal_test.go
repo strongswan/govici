@@ -45,7 +45,7 @@ func TestUnmarshalBoolTrue(t *testing.T) {
 	}
 
 	if boolMessage.Field != true {
-		t.Errorf("Unmarshalled boolean value is invalid.\nExpected: true\nReceived: %+v", boolMessage.Field)
+		t.Fatalf("Unmarshalled boolean value is invalid.\nExpected: true\nReceived: %+v", boolMessage.Field)
 	}
 }
 
@@ -70,7 +70,7 @@ func TestUnmarshalBoolFalse(t *testing.T) {
 	}
 
 	if boolMessage.Field != false {
-		t.Errorf("Unmarshalled boolean value is invalid.\nExpected: false\nReceived: %+v", boolMessage.Field)
+		t.Fatalf("Unmarshalled boolean value is invalid.\nExpected: false\nReceived: %+v", boolMessage.Field)
 	}
 }
 
@@ -116,7 +116,7 @@ func TestUnmarshalInt(t *testing.T) {
 	}
 
 	if intMessage.Field != 23 {
-		t.Errorf("Unmarshalled int value is invalid.\nExpected: 23\nReceived: %+v", intMessage.Field)
+		t.Fatalf("Unmarshalled int value is invalid.\nExpected: 23\nReceived: %+v", intMessage.Field)
 	}
 }
 
@@ -141,7 +141,7 @@ func TestUnmarshalInt2(t *testing.T) {
 	}
 
 	if intMessage.Field != -23 {
-		t.Errorf("Unmarshalled int value is invalid.\nExpected: -23\nReceived: %+v", intMessage.Field)
+		t.Fatalf("Unmarshalled int value is invalid.\nExpected: -23\nReceived: %+v", intMessage.Field)
 	}
 }
 
@@ -166,7 +166,7 @@ func TestUnmarshalInt8(t *testing.T) {
 	}
 
 	if intMessage.Field != 23 {
-		t.Errorf("Unmarshalled int8 value is invalid.\nExpected: 23\nReceived: %+v", intMessage.Field)
+		t.Fatalf("Unmarshalled int8 value is invalid.\nExpected: 23\nReceived: %+v", intMessage.Field)
 	}
 }
 
@@ -191,7 +191,7 @@ func TestUnmarshalInt8Overflow(t *testing.T) {
 	}
 
 	if intMessage.Field == 23 {
-		t.Errorf("Unmarshalled int8 value is invalid.\nExpected: -23 (Overflow)\nReceived: %+v", intMessage.Field)
+		t.Fatalf("Unmarshalled int8 value is invalid.\nExpected: -23 (Overflow)\nReceived: %+v", intMessage.Field)
 	}
 }
 
@@ -216,7 +216,7 @@ func TestUnmarshalUint(t *testing.T) {
 	}
 
 	if intMessage.Field != 23 {
-		t.Errorf("Unmarshalled uint value is invalid.\nExpected: 23\nReceived: %+v", intMessage.Field)
+		t.Fatalf("Unmarshalled uint value is invalid.\nExpected: 23\nReceived: %+v", intMessage.Field)
 	}
 }
 
@@ -263,6 +263,6 @@ func TestUnmarshalEnumType(t *testing.T) {
 	}
 
 	if enumMessage.Field != testValue {
-		t.Errorf("Unmarshalled uint value is invalid.\nExpected: %+v\nReceived: %+v", testValue, enumMessage.Field)
+		t.Fatalf("Unmarshalled uint value is invalid.\nExpected: %+v\nReceived: %+v", testValue, enumMessage.Field)
 	}
 }

@@ -79,41 +79,41 @@ func TestPacketParse(t *testing.T) {
 
 	err := p.parse(goldNamedPacketBytes)
 	if err != nil {
-		t.Errorf("Error parsing packet: %v", err)
+		t.Fatalf("Error parsing packet: %v", err)
 	}
 
 	if !reflect.DeepEqual(p, goldNamedPacket) {
-		t.Errorf("Parsed named packet does not equal gold packet.\nExpected: %v\nReceived: %v", goldNamedPacket, p)
+		t.Fatalf("Parsed named packet does not equal gold packet.\nExpected: %v\nReceived: %v", goldNamedPacket, p)
 	}
 
 	p = &packet{}
 
 	err = p.parse(goldUnnamedPacketBytes)
 	if err != nil {
-		t.Errorf("Error parsing packet: %v", err)
+		t.Fatalf("Error parsing packet: %v", err)
 	}
 
 	if !reflect.DeepEqual(p, goldUnnamedPacket) {
-		t.Errorf("Parsed unnamed packet does not equal gold packet.\nExpected: %v\nReceived: %v", goldUnnamedPacket, p)
+		t.Fatalf("Parsed unnamed packet does not equal gold packet.\nExpected: %v\nReceived: %v", goldUnnamedPacket, p)
 	}
 }
 
 func TestPacketBytes(t *testing.T) {
 	b, err := goldNamedPacket.bytes()
 	if err != nil {
-		t.Errorf("Unexpected error getting packet bytes: %v", err)
+		t.Fatalf("Unexpected error getting packet bytes: %v", err)
 	}
 
 	if !bytes.Equal(b, goldNamedPacketBytes) {
-		t.Errorf("Encoded packet does not equal gold bytes.\nExpected: %v\nReceived: %v", goldNamedPacketBytes, b)
+		t.Fatalf("Encoded packet does not equal gold bytes.\nExpected: %v\nReceived: %v", goldNamedPacketBytes, b)
 	}
 
 	b, err = goldUnnamedPacket.bytes()
 	if err != nil {
-		t.Errorf("Unexpected error getting packet bytes: %v", err)
+		t.Fatalf("Unexpected error getting packet bytes: %v", err)
 	}
 
 	if !bytes.Equal(b, goldUnnamedPacketBytes) {
-		t.Errorf("Encoded packet does not equal gold bytes.\nExpected: %v\nReceived: %v", goldUnnamedPacketBytes, b)
+		t.Fatalf("Encoded packet does not equal gold bytes.\nExpected: %v\nReceived: %v", goldUnnamedPacketBytes, b)
 	}
 }

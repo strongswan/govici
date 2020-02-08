@@ -72,7 +72,7 @@ func TestTransportSend(t *testing.T) {
 
 	err := tr.send(goldNamedPacket)
 	if err != nil {
-		t.Errorf("Unexpected error sending packet: %v", err)
+		t.Fatalf("Unexpected error sending packet: %v", err)
 	}
 
 	<-done
@@ -113,7 +113,7 @@ func TestTransportRecv(t *testing.T) {
 
 	_, err := srvr.Write(b)
 	if err != nil {
-		t.Errorf("Unexpected error sending bytes: %v", err)
+		t.Fatalf("Unexpected error sending bytes: %v", err)
 	}
 
 	<-done

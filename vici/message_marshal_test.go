@@ -40,7 +40,7 @@ func TestMarshalBoolTrue(t *testing.T) {
 
 	value := m.Get("field")
 	if !reflect.DeepEqual(value, "yes") {
-		t.Errorf("Marshalled boolean value is invalid.\nExpected: yes\nReceived: %+v", value)
+		t.Fatalf("Marshalled boolean value is invalid.\nExpected: yes\nReceived: %+v", value)
 	}
 
 }
@@ -60,7 +60,7 @@ func TestMarshalBoolFalse(t *testing.T) {
 
 	value := m.Get("field")
 	if !reflect.DeepEqual(value, "no") {
-		t.Errorf("Marshalled boolean value is invalid.\nExpected: no\nReceived: %+v", value)
+		t.Fatalf("Marshalled boolean value is invalid.\nExpected: no\nReceived: %+v", value)
 	}
 
 }
@@ -80,7 +80,7 @@ func TestMarshalInt(t *testing.T) {
 
 	value := m.Get("field")
 	if !reflect.DeepEqual(value, "23") {
-		t.Errorf("Marshalled int value is invalid.\nExpected: 23\nReceived: %+v", value)
+		t.Fatalf("Marshalled int value is invalid.\nExpected: 23\nReceived: %+v", value)
 	}
 }
 
@@ -99,7 +99,7 @@ func TestMarshalInt2(t *testing.T) {
 
 	value := m.Get("field")
 	if !reflect.DeepEqual(value, "-23") {
-		t.Errorf("Marshalled int value is invalid.\nExpected: -23\nReceived: %+v", value)
+		t.Fatalf("Marshalled int value is invalid.\nExpected: -23\nReceived: %+v", value)
 	}
 }
 
@@ -118,7 +118,7 @@ func TestMarshalInt8(t *testing.T) {
 
 	value := m.Get("field")
 	if !reflect.DeepEqual(value, "23") {
-		t.Errorf("Marshalled int8 value is invalid.\nExpected: 23\nReceived: %+v", value)
+		t.Fatalf("Marshalled int8 value is invalid.\nExpected: 23\nReceived: %+v", value)
 	}
 }
 
@@ -137,7 +137,7 @@ func TestMarshalUint(t *testing.T) {
 
 	value := m.Get("field")
 	if !reflect.DeepEqual(value, "23") {
-		t.Errorf("Marshalled uint value is invalid.\nExpected: 23\nReceived: %+v", value)
+		t.Fatalf("Marshalled uint value is invalid.\nExpected: 23\nReceived: %+v", value)
 	}
 }
 
@@ -156,7 +156,7 @@ func TestMarshalUint8(t *testing.T) {
 
 	value := m.Get("field")
 	if !reflect.DeepEqual(value, "23") {
-		t.Errorf("Marshalled uint8 value is invalid.\nExpected: 23\nReceived: %+v", value)
+		t.Fatalf("Marshalled uint8 value is invalid.\nExpected: 23\nReceived: %+v", value)
 	}
 }
 
@@ -178,7 +178,7 @@ func TestMarshalEnumType(t *testing.T) {
 
 	value := m.Get("field")
 	if value.(string) != string(testValue) {
-		t.Errorf("Marshalled enum type value is invalid.\nExpected: %+v\nReceived: %+v", testValue, value)
+		t.Fatalf("Marshalled enum type value is invalid.\nExpected: %+v\nReceived: %+v", testValue, value)
 	}
 
 }
@@ -206,7 +206,7 @@ func TestMarshalEmbeddedMap(t *testing.T) {
 
 	value = field.Get("sub")
 	if !reflect.DeepEqual(value, goldMarshaled) {
-		t.Errorf("Marshalled map value is invalid.\nExpected: %+v\nReceived: %+v", goldMarshaled, value)
+		t.Fatalf("Marshalled map value is invalid.\nExpected: %+v\nReceived: %+v", goldMarshaled, value)
 	}
 
 }
