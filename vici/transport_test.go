@@ -22,6 +22,7 @@ package vici
 
 import (
 	"bytes"
+	"encoding/binary"
 	"net"
 	"reflect"
 	"testing"
@@ -36,15 +37,35 @@ func TestTransportSend(t *testing.T) {
 		conn: client,
 	}
 
+	done := make(chan struct{}, 1)
+
 	// Send packet and ensure that what is read matches the gold bytes
 	go func() {
-		b := make([]byte, maxSegment)
-		n, err := srvr.Read(b)
+		defer close(done)
+
+		// Read the header to get the packet length...
+		b := make([]byte, headerLength)
+
+		_, err := srvr.Read(b)
 		if err != nil {
 			t.Errorf("Unexpected error reading bytes: %v", err)
 		}
 
-		if !bytes.Equal(b[:n], goldNamedPacketBytes) {
+		length := binary.BigEndian.Uint32(b)
+
+		if want := len(goldNamedPacketBytes); length != uint32(want) {
+			t.Errorf("Unexpected packet length: got %d, expected: %d", length, want)
+		}
+
+		// Read the packet data...
+		b = make([]byte, length)
+
+		_, err = srvr.Read(b)
+		if err != nil {
+			t.Errorf("Unexpected error reading bytes: %v", err)
+		}
+
+		if !bytes.Equal(b, goldNamedPacketBytes) {
 			t.Errorf("Received byte stream does not equal gold bytes.\nExpected: %v\nReceived: %v", goldUnnamedPacketBytes, b)
 		}
 	}()
@@ -53,6 +74,8 @@ func TestTransportSend(t *testing.T) {
 	if err != nil {
 		t.Errorf("Unexpected error sending packet: %v", err)
 	}
+
+	<-done
 }
 
 func TestTransportRecv(t *testing.T) {
@@ -64,9 +87,13 @@ func TestTransportRecv(t *testing.T) {
 		conn: client,
 	}
 
+	done := make(chan struct{}, 1)
+
 	// Server sends bytes, client reads a returns a packet. Ensure that the
 	// packet is goldNamedPacket
 	go func() {
+		defer close(done)
+
 		p, err := tr.recv()
 		if err != nil {
 			t.Errorf("Unexpected error receiving packet: %v", err)
@@ -77,8 +104,17 @@ func TestTransportRecv(t *testing.T) {
 		}
 	}()
 
-	_, err := srvr.Write(goldNamedPacketBytes)
+	// Make a buffer big enough for the data and the header.
+	b := make([]byte, headerLength+len(goldNamedPacketBytes))
+
+	binary.BigEndian.PutUint32(b[:headerLength], uint32(len(goldNamedPacketBytes)))
+
+	copy(b[headerLength:], goldNamedPacketBytes)
+
+	_, err := srvr.Write(b)
 	if err != nil {
 		t.Errorf("Unexpected error sending bytes: %v", err)
 	}
+
+	<-done
 }
