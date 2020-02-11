@@ -104,24 +104,24 @@ func (p *packet) bytes() ([]byte, error) {
 	if p.isNamed() {
 		err := buf.WriteByte(uint8(len(p.name)))
 		if err != nil {
-			return []byte{}, fmt.Errorf("%v: %v", errPacketWrite, err)
+			return nil, fmt.Errorf("%v: %v", errPacketWrite, err)
 		}
 
 		_, err = buf.WriteString(p.name)
 		if err != nil {
-			return []byte{}, fmt.Errorf("%v: %v", errPacketWrite, err)
+			return nil, fmt.Errorf("%v: %v", errPacketWrite, err)
 		}
 	}
 
 	if p.msg != nil {
 		b, err := p.msg.encode()
 		if err != nil {
-			return []byte{}, err
+			return nil, err
 		}
 
 		_, err = buf.Write(b)
 		if err != nil {
-			return []byte{}, fmt.Errorf("%v: %v", errPacketWrite, err)
+			return nil, fmt.Errorf("%v: %v", errPacketWrite, err)
 		}
 	}
 
