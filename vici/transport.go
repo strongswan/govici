@@ -34,9 +34,6 @@ const (
 
 	// Each segment is prefixed by a 4-byte header in network oreder
 	headerLength = 4
-
-	// Maximum segment length is 512KB
-	maxSegment = 512 * 1024
 )
 
 var (

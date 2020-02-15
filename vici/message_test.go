@@ -132,8 +132,7 @@ type testMessage struct {
 	Section2 *testSection `vici:"section2"`
 	Skip     string       `vici:"-"`
 
-	NotTagged  string
-	unexported string
+	NotTagged string
 }
 
 type testSection struct {
@@ -272,7 +271,6 @@ func TestMarshalMessageMap(t *testing.T) {
 	}
 
 	// Map keys are unordered, so we need to compare differently
-
 	marshaledKeys := append(goldMarshaled.keys[:0:0], goldMarshaled.keys...)
 	sort.Strings(m.keys)
 	sort.Strings(marshaledKeys)
@@ -303,7 +301,6 @@ func TestUnmarshalMessage(t *testing.T) {
 }
 
 func TestUnmarshalMessageMapSimple(t *testing.T) {
-
 	marshaled := &Message{
 		keys: []string{"one", "two"},
 		data: map[string]interface{}{
@@ -334,7 +331,6 @@ func TestUnmarshalMessageMapSimple(t *testing.T) {
 	if two != "2" {
 		t.Fatalf("Value of 'two' is incorrect.\nExpected: 2\nReceived: %s", two)
 	}
-
 }
 
 func TestUnmarshalMessageMapPointers(t *testing.T) {

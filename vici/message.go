@@ -314,7 +314,6 @@ func (m *Message) decode(data []byte) error {
 	for buf.Len() > 0 {
 		// Determine the next message element
 		switch b {
-
 		case msgKeyValue:
 			n, err := m.decodeKeyValue(buf.Bytes())
 			if err != nil {
@@ -466,7 +465,6 @@ func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
 		var data []byte
 
 		switch rv.Kind() {
-
 		case reflect.String:
 			uv := v.(string)
 
@@ -502,7 +500,6 @@ func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("%v: %v", errEncoding, err)
 		}
-
 	}
 
 	// Indicate the end of the section
@@ -535,7 +532,6 @@ func (m *Message) decodeKeyValue(data []byte) (int, error) {
 	v := buf.Next(2)
 	if len(v) != 2 {
 		return -1, errEndOfBuffer
-
 	}
 
 	// Read the value from the buffer
@@ -599,7 +595,6 @@ func (m *Message) decodeList(data []byte) (int, error) {
 		v := buf.Next(2)
 		if len(v) != 2 {
 			return -1, errEndOfBuffer
-
 		}
 
 		// Read the value from the buffer
@@ -661,7 +656,6 @@ func (m *Message) decodeSection(data []byte) (int, error) {
 	for b != msgSectionEnd {
 		// Determine the next message element
 		switch b {
-
 		case msgKeyValue:
 			n, err := section.decodeKeyValue(buf.Bytes())
 			if err != nil {
@@ -818,7 +812,6 @@ func (m *Message) marshalField(name string, rv reflect.Value) error {
 	}
 
 	switch rv.Kind() {
-
 	case reflect.String:
 		return m.addItem(name, rv.String())
 
@@ -889,7 +882,6 @@ func (m *Message) unmarshal(v interface{}) error {
 
 	default:
 		return fmt.Errorf("%v: cannot unmarshal into %v", errUnmarshalUnsupportedType, rv.Kind())
-
 	}
 }
 
@@ -935,7 +927,6 @@ func (m *Message) unmarshalToMap(rv reflect.Value) error {
 		// addressable. Thus we must create a new value element and set that
 		// to the map instead.
 		switch mapElemType.Kind() {
-
 		case reflect.Ptr:
 			if !rfv.IsValid() {
 				rfv = reflect.New(mapElemType.Elem())
@@ -976,7 +967,6 @@ func (m *Message) unmarshalToMap(rv reflect.Value) error {
 
 func (m *Message) unmarshalField(field reflect.Value, rv reflect.Value) error {
 	switch field.Kind() {
-
 	case reflect.String:
 		if _, ok := rv.Interface().(string); !ok {
 			return fmt.Errorf("%v: string and %v", errUnmarshalTypeMismatch, rv.Type())
@@ -1078,7 +1068,6 @@ func (m *Message) unmarshalField(field reflect.Value, rv reflect.Value) error {
 
 	default:
 		return fmt.Errorf("%v: %v", errUnmarshalUnsupportedType, field.Kind())
-
 	}
 
 	return nil

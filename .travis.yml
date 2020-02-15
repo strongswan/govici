@@ -6,7 +6,7 @@ jobs:
     include:
         - stage: lint
           before_install:
-            - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.16.0
+            - curl -sfL https://install.goreleaser.com/github.com/golangci/golangci-lint.sh | sh -s -- -b $(go env GOPATH)/bin v1.23.3
           script: make golint
         - stage: test
           install: sudo apt install strongswan-charon strongswan-swanctl -y

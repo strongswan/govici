@@ -12,4 +12,4 @@ test:
 
 .PHONY: golint
 golint:
-	golangci-lint --verbose run --enable-all -Dgochecknoglobals -Dgochecknoinits -Dlll --exclude unused
+	golangci-lint --verbose run --enable-all -Dgochecknoglobals -Dgochecknoinits -Dlll -Dgomnd -Dfunlen -Dwsl -Dgocognit
