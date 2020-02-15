@@ -25,7 +25,6 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"sync"
 	"time"
 )
 
@@ -37,20 +36,25 @@ var (
 type eventListener struct {
 	*transport
 
+	// Internal Context and CancelFunc used to stop the
+	// listen loop.
+	ctx    context.Context
+	cancel context.CancelFunc
+
+	// Used in destroy() to signal that cleanup has finished.
+	//
+	// This pair is separate than the above ctx and cancel since
+	// cancel is used as the entry point to destroy, and so ctx.Done()
+	// would return before destroy has finished.
+	dctx    context.Context
+	dcancel context.CancelFunc
+
 	// Context supplied by caller through Listen.
 	lctx context.Context
 
+	// Event channel and the events it's listening for.
 	ec     chan event
 	events []string
-
-	// Closing context and its cancel func are used to
-	// indicate that this event listener has been Close()'d.
-	//
-	// Use a sync.Once to make sure that destroy() is a no-op
-	// after first call to it.
-	ctx    context.Context
-	cancel context.CancelFunc
-	once   sync.Once
 }
 
 type event struct {
@@ -58,36 +62,76 @@ type event struct {
 	err error
 }
 
-func newEventListener(ctx context.Context, t *transport) *eventListener {
-	cctx, ccancel := context.WithCancel(context.Background())
+func newEventListener(lctx context.Context, t *transport) *eventListener {
+	ctx, cancel := context.WithCancel(context.Background())
+	dctx, dcancel := context.WithCancel(context.Background())
 
 	return &eventListener{
 		transport: t,
-		lctx:      ctx,
+		ctx:       ctx,
+		cancel:    cancel,
+		dctx:      dctx,
+		dcancel:   dcancel,
+		lctx:      lctx,
 		ec:        make(chan event, 16),
-		ctx:       cctx,
-		cancel:    ccancel,
 	}
 }
 
 // Close closes the event channel.
 func (el *eventListener) Close() error {
+	// Cancel the event listener context, and
+	// wait for the destroy context to be done.
 	el.cancel()
+
+	<-el.dctx.Done()
 
 	return nil
 }
 
-// Done returns if the event listener is closed.
-func (el *eventListener) Done() <-chan struct{} {
-	return el.ctx.Done()
+func (el *eventListener) isActive() bool {
+	if el.dctx == nil || el.lctx == nil {
+		return false
+	}
+
+	select {
+	case <-el.dctx.Done():
+		// This case means the event listener has been
+		// destroy()'d, so it's no longer active.
+		return false
+
+	case <-el.lctx.Done():
+		// This case happens if a user-supplied context is
+		// cancelled, and isActive is called before destroy()
+		// has finished.
+		//
+		// We know dctx WILL will be cancelled if we've gotten
+		// this far, so wait until that happens, then return false.
+		<-el.dctx.Done()
+
+		return false
+
+	default:
+		// If these contexts are still active, then so is the
+		// event listener.
+		return true
+	}
 }
 
 func (el *eventListener) destroy() {
-	el.once.Do(func() {
-		el.unregisterEvents(el.events)
-		close(el.ec)
-		el.conn.Close()
-	})
+	// This call interacts with charon, so get it
+	// done first. Then, the transport conn can
+	// be closed.
+	el.unregisterEvents(el.events)
+	el.conn.Close()
+
+	// Close event channel. This ensures that any active
+	// calls to NextEvent will return.
+	close(el.ec)
+
+	// Finally, signal that destroy is finished. This MUST
+	// be done last, as it acts as a signal to Close that
+	// cleanup is done.
+	el.dcancel()
 }
 
 func (el *eventListener) listen(events []string) (err error) {
