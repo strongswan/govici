@@ -25,7 +25,6 @@ import (
 )
 
 func TestUnmarshalBoolTrue(t *testing.T) {
-
 	boolMessage := struct {
 		Field bool `vici:"field"`
 	}{
@@ -50,7 +49,6 @@ func TestUnmarshalBoolTrue(t *testing.T) {
 }
 
 func TestUnmarshalBoolFalse(t *testing.T) {
-
 	boolMessage := struct {
 		Field bool `vici:"field"`
 	}{
@@ -75,7 +73,6 @@ func TestUnmarshalBoolFalse(t *testing.T) {
 }
 
 func TestUnmarshalBoolInvalid(t *testing.T) {
-
 	boolMessage := struct {
 		Field bool `vici:"field"`
 	}{
@@ -96,7 +93,6 @@ func TestUnmarshalBoolInvalid(t *testing.T) {
 }
 
 func TestUnmarshalInt(t *testing.T) {
-
 	intMessage := struct {
 		Field int `vici:"field"`
 	}{
@@ -121,7 +117,6 @@ func TestUnmarshalInt(t *testing.T) {
 }
 
 func TestUnmarshalInt2(t *testing.T) {
-
 	intMessage := struct {
 		Field int `vici:"field"`
 	}{
@@ -146,7 +141,6 @@ func TestUnmarshalInt2(t *testing.T) {
 }
 
 func TestUnmarshalInt8(t *testing.T) {
-
 	intMessage := struct {
 		Field int8 `vici:"field"`
 	}{
@@ -171,7 +165,6 @@ func TestUnmarshalInt8(t *testing.T) {
 }
 
 func TestUnmarshalInt8Overflow(t *testing.T) {
-
 	intMessage := struct {
 		Field int8 `vici:"field"`
 	}{
@@ -196,7 +189,6 @@ func TestUnmarshalInt8Overflow(t *testing.T) {
 }
 
 func TestUnmarshalUint(t *testing.T) {
-
 	intMessage := struct {
 		Field uint `vici:"field"`
 	}{
@@ -221,7 +213,6 @@ func TestUnmarshalUint(t *testing.T) {
 }
 
 func TestUnmarshalUintInvalid(t *testing.T) {
-
 	intMessage := struct {
 		Field uint `vici:"field"`
 	}{
@@ -242,7 +233,6 @@ func TestUnmarshalUintInvalid(t *testing.T) {
 }
 
 func TestUnmarshalEnumType(t *testing.T) {
-
 	type TestType string
 	const testValue TestType = "test-value"
 

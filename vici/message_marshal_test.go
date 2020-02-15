@@ -26,7 +26,6 @@ import (
 )
 
 func TestMarshalBoolTrue(t *testing.T) {
-
 	boolMessage := struct {
 		Field bool `vici:"field"`
 	}{
@@ -42,11 +41,9 @@ func TestMarshalBoolTrue(t *testing.T) {
 	if !reflect.DeepEqual(value, "yes") {
 		t.Fatalf("Marshalled boolean value is invalid.\nExpected: yes\nReceived: %+v", value)
 	}
-
 }
 
 func TestMarshalBoolFalse(t *testing.T) {
-
 	boolMessage := struct {
 		Field bool `vici:"field"`
 	}{
@@ -62,11 +59,9 @@ func TestMarshalBoolFalse(t *testing.T) {
 	if !reflect.DeepEqual(value, "no") {
 		t.Fatalf("Marshalled boolean value is invalid.\nExpected: no\nReceived: %+v", value)
 	}
-
 }
 
 func TestMarshalInt(t *testing.T) {
-
 	intMessage := struct {
 		Field int `vici:"field"`
 	}{
@@ -85,7 +80,6 @@ func TestMarshalInt(t *testing.T) {
 }
 
 func TestMarshalInt2(t *testing.T) {
-
 	intMessage := struct {
 		Field int `vici:"field"`
 	}{
@@ -104,7 +98,6 @@ func TestMarshalInt2(t *testing.T) {
 }
 
 func TestMarshalInt8(t *testing.T) {
-
 	intMessage := struct {
 		Field int8 `vici:"field"`
 	}{
@@ -123,7 +116,6 @@ func TestMarshalInt8(t *testing.T) {
 }
 
 func TestMarshalUint(t *testing.T) {
-
 	intMessage := struct {
 		Field uint `vici:"field"`
 	}{
@@ -142,7 +134,6 @@ func TestMarshalUint(t *testing.T) {
 }
 
 func TestMarshalUint8(t *testing.T) {
-
 	intMessage := struct {
 		Field uint8 `vici:"field"`
 	}{
@@ -161,7 +152,6 @@ func TestMarshalUint8(t *testing.T) {
 }
 
 func TestMarshalEnumType(t *testing.T) {
-
 	type TestType string
 	const testValue TestType = "test-value"
 
@@ -180,11 +170,9 @@ func TestMarshalEnumType(t *testing.T) {
 	if value.(string) != string(testValue) {
 		t.Fatalf("Marshalled enum type value is invalid.\nExpected: %+v\nReceived: %+v", testValue, value)
 	}
-
 }
 
 func TestMarshalEmbeddedMap(t *testing.T) {
-
 	mapValue := map[string]interface{}{"sub": goldUnmarshaled}
 
 	mapMessage := struct {
@@ -208,5 +196,4 @@ func TestMarshalEmbeddedMap(t *testing.T) {
 	if !reflect.DeepEqual(value, goldMarshaled) {
 		t.Fatalf("Marshalled map value is invalid.\nExpected: %+v\nReceived: %+v", goldMarshaled, value)
 	}
-
 }
