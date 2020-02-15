@@ -26,6 +26,7 @@ import (
 	"log"
 	"net"
 	"testing"
+	"time"
 )
 
 func mockCharon(ctx context.Context) net.Conn {
@@ -254,4 +255,81 @@ func TestStreamedCommandRequest(t *testing.T) {
 			t.Fatalf("Got error in message #%d: %v", i+1, m.Err())
 		}
 	}
+}
+
+func TestListenCancelListenAgain(t *testing.T) {
+	maybeSkipIntegrationTest(t)
+
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+	defer s.Close()
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	err = s.Listen(ctx, "control-log")
+	if err != nil {
+		t.Fatalf("Failed to start event listener (first time): %v", err)
+	}
+
+	cancel()
+
+	err = s.Listen(context.Background(), "control-log")
+	if err != nil {
+		t.Fatalf("Failed to start event listener (second time): %v", err)
+	}
+}
+
+func TestListenWhenAlreadyActive(t *testing.T) {
+	maybeSkipIntegrationTest(t)
+
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+	defer s.Close()
+
+	if err := s.Listen(context.Background(), "control-log"); err != nil {
+		t.Fatalf("Failed to start event listener: %v", err)
+	}
+
+	// This should return an error since an event listener was just registered.
+	if err := s.Listen(context.Background(), "control-log"); err == nil {
+		t.Fatal("Expected error when registering a second event listener!")
+	}
+}
+
+func TestCloseWithActiveNextEvent(t *testing.T) {
+	maybeSkipIntegrationTest(t)
+
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+
+	if err := s.Listen(context.Background(), "ike-updown"); err != nil {
+		t.Fatalf("Failed to start event listener: %v", err)
+	}
+
+	done := make(chan struct{}, 1)
+
+	go func() {
+		defer close(done)
+
+		_, err := s.NextEvent()
+		if err == nil {
+			t.Errorf("Expected error when reading event from closed listener")
+		}
+	}()
+
+	// Sleep before closing to ensure that NextEvent is called
+	// before Close.
+	<-time.After(3 * time.Second)
+
+	if err := s.Close(); err != nil {
+		t.Fatalf("Unexpected error closing session: %v", err)
+	}
+
+	<-done
 }
