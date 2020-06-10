@@ -162,6 +162,9 @@ func UnmarshalMessage(m *Message, v interface{}) error {
 //  - map (the map must be valid as per MarshalMessage)
 //  - struct (the struct must be valid as per MarshalMessage)
 //
+// Pointer types of the above are allowed and can be used to differentiate between
+// an unset value and a zero value. If a pointer is nil, it is not added to the message.
+//
 // If the key already exists the value is overwritten, but the ordering
 // of the message is not changed.
 func (m *Message) Set(key string, value interface{}) error {
@@ -834,13 +837,7 @@ func (m *Message) marshalField(name string, rv reflect.Value) error {
 		if _, ok := rv.Interface().(*Message); ok {
 			return m.addItem(name, rv.Interface())
 		}
-
-		msg := NewMessage()
-		if err := msg.marshal(rv.Interface()); err != nil {
-			return err
-		}
-
-		return m.addItem(name, msg)
+		return m.marshalField(name, reflect.Indirect(rv))
 
 	case reflect.Struct, reflect.Map:
 		msg := NewMessage()
@@ -1029,16 +1026,11 @@ func (m *Message) unmarshalField(field reflect.Value, rv reflect.Value) error {
 			return nil
 		}
 
-		msg, ok := rv.Interface().(*Message)
-		if !ok {
-			return fmt.Errorf("%v: %v", errUnmarshalNonMessage, rv.Type())
-		}
-
 		if field.IsNil() {
 			field.Set(reflect.New(field.Type().Elem()))
 		}
 
-		return msg.unmarshal(field.Interface())
+		return m.unmarshalField(field.Elem(), rv)
 
 	case reflect.Struct:
 		msg, ok := rv.Interface().(*Message)

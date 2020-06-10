@@ -92,6 +92,62 @@ func TestUnmarshalBoolInvalid(t *testing.T) {
 	}
 }
 
+func TestUnmarshalBoolTruePtr(t *testing.T) {
+	boolMessage := struct {
+		Field *bool `vici:"field"`
+	}{
+		Field: nil,
+	}
+
+	m := &Message{
+		[]string{"field"},
+		map[string]interface{}{
+			"field": "yes",
+		},
+	}
+
+	err := UnmarshalMessage(m, &boolMessage)
+	if err != nil {
+		t.Fatalf("Error unmarshalling bool value to pointer: %v", err)
+	}
+
+	if boolMessage.Field == nil {
+		t.Fatalf("Unmarshalled boolean pointer is nil.")
+	}
+
+	if *boolMessage.Field != true {
+		t.Fatalf("Unmarshalled boolean value is invalid.\nExpected: true\nReceived: %+v", *boolMessage.Field)
+	}
+}
+
+func TestUnmarshalBoolFalsePtr(t *testing.T) {
+	boolMessage := struct {
+		Field *bool `vici:"field"`
+	}{
+		Field: nil,
+	}
+
+	m := &Message{
+		[]string{"field"},
+		map[string]interface{}{
+			"field": "no",
+		},
+	}
+
+	err := UnmarshalMessage(m, &boolMessage)
+	if err != nil {
+		t.Fatalf("Error unmarshalling bool value to pointer: %v", err)
+	}
+
+	if boolMessage.Field == nil {
+		t.Fatalf("Unmarshalled boolean pointer is nil.")
+	}
+
+	if *boolMessage.Field != false {
+		t.Fatalf("Unmarshalled boolean value is invalid.\nExpected: false\nReceived: %+v", *boolMessage.Field)
+	}
+}
+
 func TestUnmarshalInt(t *testing.T) {
 	intMessage := struct {
 		Field int `vici:"field"`
