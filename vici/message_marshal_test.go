@@ -61,6 +61,62 @@ func TestMarshalBoolFalse(t *testing.T) {
 	}
 }
 
+func TestMarshalBoolTruePtr(t *testing.T) {
+	boolValue := true
+	boolMessage := struct {
+		Field *bool `vici:"field"`
+	}{
+		Field: &boolValue,
+	}
+
+	m, err := MarshalMessage(boolMessage)
+	if err != nil {
+		t.Fatalf("Error marshalling pointer to bool value: %v", err)
+	}
+
+	value := m.Get("field")
+	if !reflect.DeepEqual(value, "yes") {
+		t.Fatalf("Marshalled boolean pointer value is invalid.\nExpected: yes\nReceived: %+v", value)
+	}
+}
+
+func TestMarshalBoolFalsePtr(t *testing.T) {
+	boolValue := false
+	boolMessage := struct {
+		Field *bool `vici:"field"`
+	}{
+		Field: &boolValue,
+	}
+
+	m, err := MarshalMessage(boolMessage)
+	if err != nil {
+		t.Fatalf("Error marshalling pointer to bool value: %v", err)
+	}
+
+	value := m.Get("field")
+	if !reflect.DeepEqual(value, "no") {
+		t.Fatalf("Marshalled boolean pointer value is invalid.\nExpected: no\nReceived: %+v", value)
+	}
+}
+
+func TestMarshalBoolNilPtr(t *testing.T) {
+	boolMessage := struct {
+		Field *bool `vici:"field"`
+	}{
+		Field: nil,
+	}
+
+	m, err := MarshalMessage(boolMessage)
+	if err != nil {
+		t.Fatalf("Error marshalling pointer to bool value: %v", err)
+	}
+
+	value := m.Get("field")
+	if value != nil {
+		t.Fatalf("Marshalled nil boolean pointer value is present.\nReceived: %+v", value)
+	}
+}
+
 func TestMarshalInt(t *testing.T) {
 	intMessage := struct {
 		Field int `vici:"field"`
