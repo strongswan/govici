@@ -503,6 +503,39 @@ func TestMessageSet(t *testing.T) {
 	}
 }
 
+func TestMessageUnset(t *testing.T) {
+	m1 := &Message{
+		keys: []string{"test1", "test2", "test3", "test4"},
+		data: map[string]interface{}{
+			"test1": 1,
+			"test2": 2,
+			"test3": 3,
+			"test4": 4,
+		},
+	}
+
+	m2 := &Message{
+		keys: []string{"test1", "test2", "test4"},
+		data: map[string]interface{}{
+			"test1": 1,
+			"test2": 2,
+			"test4": 4,
+		},
+	}
+
+	m1.Unset("test3")
+
+	if !reflect.DeepEqual(m1, m2) {
+		t.Fatalf("Unset corrupted message, expected: %+v\ngot: %+v\n", m2, m1)
+	}
+
+	m1.Unset("invalid")
+
+	if !reflect.DeepEqual(m1, m2) {
+		t.Fatalf("Unset with non-existent key was not a no-op, expected: %+v\ngot: %+v\n", m2, m1)
+	}
+}
+
 func TestMessageSetTypeConversion(t *testing.T) {
 	type conversion struct {
 		in  interface{}

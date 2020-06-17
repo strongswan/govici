@@ -171,6 +171,24 @@ func (m *Message) Set(key string, value interface{}) error {
 	return m.marshalField(key, reflect.ValueOf(value))
 }
 
+// Unset unsets the message field identified by key. There is no effect if the
+// key does not exist.
+func (m *Message) Unset(key string) {
+	for i, v := range m.keys {
+		if v != key {
+			continue
+		}
+
+		// If we found the key, delete it from the message
+		// keys while preserving order, and delete the value
+		// from the map.
+		m.keys = append(m.keys[:i], m.keys[i+1:]...)
+		delete(m.data, key)
+
+		return
+	}
+}
+
 // Get returns the value of the field identified by key, if it exists. If
 // the field does not exist, nil is returned.
 //
