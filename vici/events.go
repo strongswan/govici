@@ -58,8 +58,9 @@ type eventListener struct {
 }
 
 type event struct {
-	msg *Message
-	err error
+	name string
+	msg  *Message
+	err  error
 }
 
 func newEventListener(lctx context.Context, t *transport) *eventListener {
@@ -175,6 +176,7 @@ func (el *eventListener) listen(events []string) (err error) {
 				}
 
 				if p.ptype == pktEvent {
+					e.name = p.name
 					e.msg = p.msg
 					el.ec <- e
 				}
@@ -185,13 +187,13 @@ func (el *eventListener) listen(events []string) (err error) {
 	return nil
 }
 
-func (el *eventListener) nextEvent() (*Message, error) {
+func (el *eventListener) nextEvent() (string, *Message, error) {
 	e := <-el.ec
 	if e.msg == nil && e.err == nil {
-		return nil, errChannelClosed
+		return "", nil, errChannelClosed
 	}
 
-	return e.msg, e.err
+	return e.name, e.msg, e.err
 }
 
 func (el *eventListener) registerEvents(events []string) error {
