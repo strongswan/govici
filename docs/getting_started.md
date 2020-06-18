@@ -273,6 +273,8 @@ func loadX509Cert(path string, cacert bool) error {
 }
 ```
 
+Pointer types can be useful to preserve defaults as specified in [swanctl.conf](https://wiki.strongswan.org/projects/strongswan/wiki/Swanctlconf) when those defaults do not align with Go zero values. For example, mobike is [enabled by default for IKEv2 connections](https://wiki.strongswan.org/projects/strongswan/wiki/Swanctlconf#connections-section), but if you have a `Mobike bool` field in your struct, the Go zero value will override the default behavior. In these situations, using `*bool` will result in the zero-value being `nil`, and the field will not be marshaled.
+
 ## Putting it all together
 
 For a more complicated example, let's use `load-conn` to load an IKE SA configuration. The real work in doing this is defining some types to represent our configuration. The [swanctl.conf](https://wiki.strongswan.org/projects/strongswan/wiki/Swanctlconf) documentation is the best place to look for the information we need about configuration options and structure. For our case, let's take a `swanctl.conf` from the testing environment:
