@@ -53,12 +53,21 @@ type eventListener struct {
 	lctx context.Context
 
 	// Event channel and the events it's listening for.
-	ec     chan event
+	ec     chan Event
 	events []string
 }
 
-type event struct {
-	msg *Message
+// Event represents an event received by a Session sent from the
+// charon daemon. It contains an associated Message and corresponds
+// to one of the event types registered with Session.Listen.
+type Event struct {
+	// Name is the event type name as specified by the
+	// charon server, such as "ike-updown" or "log".
+	Name string
+
+	// Message is the Message associated with this event.
+	Message *Message
+
 	err error
 }
 
@@ -73,7 +82,7 @@ func newEventListener(lctx context.Context, t *transport) *eventListener {
 		dctx:      dctx,
 		dcancel:   dcancel,
 		lctx:      lctx,
-		ec:        make(chan event, 16),
+		ec:        make(chan Event, 16),
 	}
 }
 
@@ -155,7 +164,7 @@ func (el *eventListener) listen(events []string) (err error) {
 				return
 
 			default:
-				var e event
+				var e Event
 
 				// Set a read deadline so that this loop can continue
 				// at a reasonable pace. If the error is a timeout,
@@ -175,7 +184,8 @@ func (el *eventListener) listen(events []string) (err error) {
 				}
 
 				if p.ptype == pktEvent {
-					e.msg = p.msg
+					e.Name = p.name
+					e.Message = p.msg
 					el.ec <- e
 				}
 			}
@@ -185,13 +195,13 @@ func (el *eventListener) listen(events []string) (err error) {
 	return nil
 }
 
-func (el *eventListener) nextEvent() (*Message, error) {
+func (el *eventListener) nextEvent() (Event, error) {
 	e := <-el.ec
-	if e.msg == nil && e.err == nil {
-		return nil, errChannelClosed
+	if e.Message == nil && e.err == nil {
+		return Event{}, errChannelClosed
 	}
 
-	return e.msg, e.err
+	return e, e.err
 }
 
 func (el *eventListener) registerEvents(events []string) error {
