@@ -109,20 +109,20 @@ func TestListenAndCancel(t *testing.T) {
 		t.Fatalf("Failed to start event listener: %v", err)
 	}
 
-	m, err := s.NextEvent()
+	e, err := s.NextEvent()
 	if err != nil {
 		t.Fatalf("Unexpected error on NextEvent: %v", err)
 	}
 
-	if m.Get("test") != "hello world!" {
-		t.Fatalf("Unexpected message: %v", m)
+	if e.Message.Get("test") != "hello world!" {
+		t.Fatalf("Unexpected message: %v", e)
 	}
 
 	cancel()
 
-	m, err = s.NextEvent()
+	e, err = s.NextEvent()
 	if err == nil {
-		t.Fatalf("Expected error after closing listener, got message: %v", m)
+		t.Fatalf("Expected error after closing listener, got message: %v", e)
 	}
 }
 
@@ -143,21 +143,21 @@ func TestListenAndCloseSession(t *testing.T) {
 		t.Fatalf("Failed to start event listener: %v", err)
 	}
 
-	m, err := s.NextEvent()
+	e, err := s.NextEvent()
 	if err != nil {
 		t.Fatalf("Unexpected error on NextEvent: %v", err)
 	}
 
-	if m.Get("test") != "hello world!" {
-		t.Fatalf("Unexpected message: %v", m)
+	if e.Message.Get("test") != "hello world!" {
+		t.Fatalf("Unexpected message: %v", e)
 	}
 
 	// Close session
 	s.Close()
 
-	m, err = s.NextEvent()
+	e, err = s.NextEvent()
 	if err == nil {
-		t.Fatalf("Expected error after closing listener, got message: %v", m)
+		t.Fatalf("Expected error after closing listener, got message: %v", e)
 	}
 }
 
@@ -332,4 +332,41 @@ func TestCloseWithActiveNextEvent(t *testing.T) {
 	}
 
 	<-done
+}
+
+// TestEventNameIsSet tests NextEvent by making sure the event
+// type name is properly set in the returned Event. This is done
+// by listening for -- and triggering -- a 'log' event. The event
+// is triggered by a call to 'reload-settings'.
+func TestEventNameIsSet(t *testing.T) {
+	maybeSkipIntegrationTest(t)
+
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+	defer s.Close()
+
+	// Just in case the call to reload-settings doesn't trigger
+	// an event, close the listener after 5 seconds.
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := s.Listen(ctx, "log"); err != nil {
+		t.Fatalf("Failed to start event listener: %v", err)
+	}
+
+	// The event triggered by this command will be buffered in the event queue.
+	if _, err := s.CommandRequest("reload-settings", nil); err != nil {
+		t.Fatalf("Failed to send 'reload-settings' command: %v", err)
+	}
+
+	e, err := s.NextEvent()
+	if err != nil {
+		t.Fatalf("Unexpected error waiting for event: %v", err)
+	}
+
+	if e.Name != "log" {
+		t.Fatalf("Expected to receive 'log' event, got %s", e.Name)
+	}
 }
