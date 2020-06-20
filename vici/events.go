@@ -49,9 +49,6 @@ type eventListener struct {
 	dctx    context.Context
 	dcancel context.CancelFunc
 
-	// Context supplied by caller through Listen.
-	lctx context.Context
-
 	// Event channel and the events it's listening for.
 	ec     chan Event
 	events []string
@@ -71,7 +68,7 @@ type Event struct {
 	err error
 }
 
-func newEventListener(lctx context.Context, t *transport) *eventListener {
+func newEventListener(t *transport) *eventListener {
 	ctx, cancel := context.WithCancel(context.Background())
 	dctx, dcancel := context.WithCancel(context.Background())
 
@@ -81,7 +78,6 @@ func newEventListener(lctx context.Context, t *transport) *eventListener {
 		cancel:    cancel,
 		dctx:      dctx,
 		dcancel:   dcancel,
-		lctx:      lctx,
 		ec:        make(chan Event, 16),
 	}
 }
@@ -98,7 +94,7 @@ func (el *eventListener) Close() error {
 }
 
 func (el *eventListener) isActive() bool {
-	if el.dctx == nil || el.lctx == nil {
+	if el.dctx == nil {
 		return false
 	}
 
@@ -106,17 +102,6 @@ func (el *eventListener) isActive() bool {
 	case <-el.dctx.Done():
 		// This case means the event listener has been
 		// destroy()'d, so it's no longer active.
-		return false
-
-	case <-el.lctx.Done():
-		// This case happens if a user-supplied context is
-		// cancelled, and isActive is called before destroy()
-		// has finished.
-		//
-		// We know dctx WILL will be cancelled if we've gotten
-		// this far, so wait until that happens, then return false.
-		<-el.dctx.Done()
-
 		return false
 
 	default:
@@ -155,10 +140,6 @@ func (el *eventListener) listen(events []string) (err error) {
 
 		for {
 			select {
-			case <-el.lctx.Done():
-				// Caller cancelled their context.
-				return
-
 			case <-el.ctx.Done():
 				// Closer context was cancelled.
 				return

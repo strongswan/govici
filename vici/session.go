@@ -27,7 +27,6 @@
 package vici
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -207,18 +206,18 @@ func (s *Session) StreamedCommandRequest(cmd string, event string, msg *Message)
 // event channel is closed, or the given context is cancelled. To receive events that
 // are registered here, use NextEvent. An error is returned if Listen is called while
 // Session already has an event listener registered.
-func (s *Session) Listen(ctx context.Context, events ...string) error {
+func (s *Session) Listen(events ...string) error {
 	s.emux.Lock()
 	defer s.emux.Unlock()
 
-	if err := s.maybeCreateEventListener(ctx); err != nil {
+	if err := s.maybeCreateEventListener(); err != nil {
 		return err
 	}
 
 	return s.el.listen(events)
 }
 
-func (s *Session) maybeCreateEventListener(ctx context.Context) error {
+func (s *Session) maybeCreateEventListener() error {
 	if s.el != nil {
 		if s.el.isActive() {
 			return errEventListenerExists
@@ -231,7 +230,7 @@ func (s *Session) maybeCreateEventListener(ctx context.Context) error {
 		return err
 	}
 
-	s.el = newEventListener(ctx, elt)
+	s.el = newEventListener(elt)
 
 	return nil
 }
