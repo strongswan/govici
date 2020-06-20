@@ -133,7 +133,6 @@ func (el *eventListener) listen(events []string) (err error) {
 	if err != nil {
 		return err
 	}
-	el.events = events
 
 	go func() {
 		defer el.destroy()
@@ -194,13 +193,30 @@ func (el *eventListener) nextEvent(ctx context.Context) (Event, error) {
 }
 
 func (el *eventListener) registerEvents(events []string) error {
-	for i, e := range events {
-		err := el.eventRegisterUnregister(e, true)
-		if err != nil {
-			el.unregisterEvents(events[:i])
+	for _, event := range events {
+		// Check if the event is already registered.
+		exists := false
 
+		for _, registered := range el.events {
+			if event == registered {
+				exists = true
+				// Break out of the inner loop, this
+				// event is already registered.
+				break
+			}
+		}
+
+		// Check the next event given...
+		if exists {
+			continue
+		}
+
+		if err := el.eventRegisterUnregister(event, true); err != nil {
 			return err
 		}
+
+		// Add the event to the list of registered events.
+		el.events = append(el.events, event)
 	}
 
 	return nil
@@ -210,6 +226,18 @@ func (el *eventListener) unregisterEvents(events []string) {
 	for _, e := range events {
 		// nolint
 		el.eventRegisterUnregister(e, false)
+
+		for i, registered := range el.events {
+			if e != registered {
+				continue
+			}
+
+			el.events = append(el.events[:i], el.events[i+1:]...)
+
+			// Break from the inner loop, we found the event
+			// in the list of registered events.
+			break
+		}
 	}
 }
 
