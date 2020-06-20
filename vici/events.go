@@ -176,8 +176,16 @@ func (el *eventListener) listen(events []string) (err error) {
 	return nil
 }
 
-func (el *eventListener) nextEvent() (Event, error) {
-	e := <-el.ec
+func (el *eventListener) nextEvent(ctx context.Context) (Event, error) {
+	var e Event
+
+	select {
+	case <-ctx.Done():
+		return Event{}, ctx.Err()
+	case e = <-el.ec:
+		// Event received, carry on.
+	}
+
 	if e.Message == nil && e.err == nil {
 		return Event{}, errChannelClosed
 	}

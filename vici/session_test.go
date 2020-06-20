@@ -107,7 +107,7 @@ func TestListenAndCloseSession(t *testing.T) {
 		t.Fatalf("Failed to start event listener: %v", err)
 	}
 
-	e, err := s.NextEvent()
+	e, err := s.NextEvent(context.TODO())
 	if err != nil {
 		t.Fatalf("Unexpected error on NextEvent: %v", err)
 	}
@@ -119,7 +119,7 @@ func TestListenAndCloseSession(t *testing.T) {
 	// Close session
 	s.Close()
 
-	e, err = s.NextEvent()
+	e, err = s.NextEvent(context.TODO())
 	if err == nil {
 		t.Fatalf("Expected error after closing listener, got message: %v", e)
 	}
@@ -257,7 +257,7 @@ func TestCloseWithActiveNextEvent(t *testing.T) {
 	go func() {
 		defer close(done)
 
-		_, err := s.NextEvent()
+		_, err := s.NextEvent(context.TODO())
 		if err == nil {
 			t.Errorf("Expected error when reading event from closed listener")
 		}
@@ -296,12 +296,36 @@ func TestEventNameIsSet(t *testing.T) {
 		t.Fatalf("Failed to send 'reload-settings' command: %v", err)
 	}
 
-	e, err := s.NextEvent()
+	e, err := s.NextEvent(context.TODO())
 	if err != nil {
 		t.Fatalf("Unexpected error waiting for event: %v", err)
 	}
 
 	if e.Name != "log" {
 		t.Fatalf("Expected to receive 'log' event, got %s", e.Name)
+	}
+}
+
+// TestNextEventCancel ensures that a cancelled context will cause a
+// blocking NextEvent call to return.
+func TestNextEventCancel(t *testing.T) {
+	maybeSkipIntegrationTest(t)
+
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+	defer s.Close()
+
+	if err := s.Listen("ike-updown"); err != nil {
+		t.Fatalf("Failed to start event listener: %v", err)
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	_, err = s.NextEvent(ctx)
+	if err != ctx.Err() {
+		t.Fatalf("Expected to get context's timeout error after not receiving event, got: %v", err)
 	}
 }

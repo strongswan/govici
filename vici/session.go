@@ -27,6 +27,7 @@
 package vici
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -238,7 +239,7 @@ func (s *Session) maybeCreateEventListener() error {
 // NextEvent returns the next event received by the session event listener.  NextEvent is a
 // blocking call. If there is no event in the event buffer, NextEvent will wait to return until
 // a new event is received. An error is returned if the event channel is closed.
-func (s *Session) NextEvent() (Event, error) {
+func (s *Session) NextEvent(ctx context.Context) (Event, error) {
 	s.emux.RLock()
 	defer s.emux.RUnlock()
 
@@ -246,5 +247,5 @@ func (s *Session) NextEvent() (Event, error) {
 		return Event{}, errNoEventListener
 	}
 
-	return s.el.nextEvent()
+	return s.el.nextEvent(ctx)
 }
