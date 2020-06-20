@@ -90,42 +90,6 @@ func mockCharon(ctx context.Context) net.Conn {
 	return client
 }
 
-func TestListenAndCancel(t *testing.T) {
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
-
-	dctx, dcancel := context.WithCancel(context.Background())
-	defer dcancel()
-
-	conn := mockCharon(dctx)
-
-	s, err := NewSession(withTestConn(conn))
-	if err != nil {
-		t.Fatalf("Failed to create session: %v", err)
-	}
-	defer s.Close()
-
-	if err := s.Listen(ctx, "test-event"); err != nil {
-		t.Fatalf("Failed to start event listener: %v", err)
-	}
-
-	e, err := s.NextEvent()
-	if err != nil {
-		t.Fatalf("Unexpected error on NextEvent: %v", err)
-	}
-
-	if e.Message.Get("test") != "hello world!" {
-		t.Fatalf("Unexpected message: %v", e)
-	}
-
-	cancel()
-
-	e, err = s.NextEvent()
-	if err == nil {
-		t.Fatalf("Expected error after closing listener, got message: %v", e)
-	}
-}
-
 func TestListenAndCloseSession(t *testing.T) {
 	dctx, dcancel := context.WithCancel(context.Background())
 	defer dcancel()
@@ -138,7 +102,7 @@ func TestListenAndCloseSession(t *testing.T) {
 	}
 	defer s.Close()
 
-	err = s.Listen(context.Background(), "test-event")
+	err = s.Listen("test-event")
 	if err != nil {
 		t.Fatalf("Failed to start event listener: %v", err)
 	}
@@ -257,30 +221,6 @@ func TestStreamedCommandRequest(t *testing.T) {
 	}
 }
 
-func TestListenCancelListenAgain(t *testing.T) {
-	maybeSkipIntegrationTest(t)
-
-	s, err := NewSession()
-	if err != nil {
-		t.Fatalf("Failed to create session: %v", err)
-	}
-	defer s.Close()
-
-	ctx, cancel := context.WithCancel(context.Background())
-
-	err = s.Listen(ctx, "control-log")
-	if err != nil {
-		t.Fatalf("Failed to start event listener (first time): %v", err)
-	}
-
-	cancel()
-
-	err = s.Listen(context.Background(), "control-log")
-	if err != nil {
-		t.Fatalf("Failed to start event listener (second time): %v", err)
-	}
-}
-
 func TestListenWhenAlreadyActive(t *testing.T) {
 	maybeSkipIntegrationTest(t)
 
@@ -290,12 +230,12 @@ func TestListenWhenAlreadyActive(t *testing.T) {
 	}
 	defer s.Close()
 
-	if err := s.Listen(context.Background(), "control-log"); err != nil {
+	if err := s.Listen("control-log"); err != nil {
 		t.Fatalf("Failed to start event listener: %v", err)
 	}
 
 	// This should return an error since an event listener was just registered.
-	if err := s.Listen(context.Background(), "control-log"); err == nil {
+	if err := s.Listen("control-log"); err == nil {
 		t.Fatal("Expected error when registering a second event listener!")
 	}
 }
@@ -308,7 +248,7 @@ func TestCloseWithActiveNextEvent(t *testing.T) {
 		t.Fatalf("Failed to create session: %v", err)
 	}
 
-	if err := s.Listen(context.Background(), "ike-updown"); err != nil {
+	if err := s.Listen("ike-updown"); err != nil {
 		t.Fatalf("Failed to start event listener: %v", err)
 	}
 
@@ -347,12 +287,7 @@ func TestEventNameIsSet(t *testing.T) {
 	}
 	defer s.Close()
 
-	// Just in case the call to reload-settings doesn't trigger
-	// an event, close the listener after 5 seconds.
-	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
-	defer cancel()
-
-	if err := s.Listen(ctx, "log"); err != nil {
+	if err := s.Listen("log"); err != nil {
 		t.Fatalf("Failed to start event listener: %v", err)
 	}
 
