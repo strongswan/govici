@@ -203,15 +203,19 @@ func (s *Session) StreamedCommandRequest(cmd string, event string, msg *Message)
 	return s.sendStreamedRequest(cmd, event, msg)
 }
 
-// Listen registers the session to listen for all events given. Listen returns when the
-// event channel is closed, or the given context is cancelled. To receive events that
-// are registered here, use NextEvent. An error is returned if Listen is called while
-// Session already has an event listener registered.
-func (s *Session) Listen(events ...string) error {
+// Subscribe registers the session to listen for all events given. To receive
+// events that are registered here, use NextEvent. An error is returned if
+// Subscribe is not able to register the given events with the charon daemon.
+func (s *Session) Subscribe(events ...string) error {
 	s.emux.Lock()
 	defer s.emux.Unlock()
 
 	if err := s.maybeCreateEventListener(); err != nil {
+		// If the event listener exists, just register the new events.
+		if err == errEventListenerExists {
+			return s.el.registerEvents(events)
+		}
+
 		return err
 	}
 

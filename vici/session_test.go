@@ -25,6 +25,7 @@ import (
 	"flag"
 	"log"
 	"net"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -90,7 +91,7 @@ func mockCharon(ctx context.Context) net.Conn {
 	return client
 }
 
-func TestListenAndCloseSession(t *testing.T) {
+func TestSubscribeAndCloseSession(t *testing.T) {
 	dctx, dcancel := context.WithCancel(context.Background())
 	defer dcancel()
 
@@ -102,7 +103,7 @@ func TestListenAndCloseSession(t *testing.T) {
 	}
 	defer s.Close()
 
-	err = s.Listen("test-event")
+	err = s.Subscribe("test-event")
 	if err != nil {
 		t.Fatalf("Failed to start event listener: %v", err)
 	}
@@ -221,7 +222,10 @@ func TestStreamedCommandRequest(t *testing.T) {
 	}
 }
 
-func TestListenWhenAlreadyActive(t *testing.T) {
+// TestSubscribeWhenAlreadyActive tests that subscriptions can
+// be made incrementally. Namely, a caller can subcribe to one set
+// of events, and later add to the subcribed events.
+func TestSubscribeWhenAlreadyActive(t *testing.T) {
 	maybeSkipIntegrationTest(t)
 
 	s, err := NewSession()
@@ -230,13 +234,13 @@ func TestListenWhenAlreadyActive(t *testing.T) {
 	}
 	defer s.Close()
 
-	if err := s.Listen("control-log"); err != nil {
+	if err := s.Subscribe("control-log"); err != nil {
 		t.Fatalf("Failed to start event listener: %v", err)
 	}
 
-	// This should return an error since an event listener was just registered.
-	if err := s.Listen("control-log"); err == nil {
-		t.Fatal("Expected error when registering a second event listener!")
+	// This should NOT return an error.
+	if err := s.Subscribe("log"); err != nil {
+		t.Fatalf("Failed to subscribe to additional events: %v", err)
 	}
 }
 
@@ -248,7 +252,7 @@ func TestCloseWithActiveNextEvent(t *testing.T) {
 		t.Fatalf("Failed to create session: %v", err)
 	}
 
-	if err := s.Listen("ike-updown"); err != nil {
+	if err := s.Subscribe("ike-updown"); err != nil {
 		t.Fatalf("Failed to start event listener: %v", err)
 	}
 
@@ -287,7 +291,7 @@ func TestEventNameIsSet(t *testing.T) {
 	}
 	defer s.Close()
 
-	if err := s.Listen("log"); err != nil {
+	if err := s.Subscribe("log"); err != nil {
 		t.Fatalf("Failed to start event listener: %v", err)
 	}
 
@@ -317,7 +321,7 @@ func TestNextEventCancel(t *testing.T) {
 	}
 	defer s.Close()
 
-	if err := s.Listen("ike-updown"); err != nil {
+	if err := s.Subscribe("ike-updown"); err != nil {
 		t.Fatalf("Failed to start event listener: %v", err)
 	}
 
@@ -327,5 +331,34 @@ func TestNextEventCancel(t *testing.T) {
 	_, err = s.NextEvent(ctx)
 	if err != ctx.Err() {
 		t.Fatalf("Expected to get context's timeout error after not receiving event, got: %v", err)
+	}
+}
+
+// TestSubscribeConsecutively ensures that consecutive calls to subscribe
+// registers only NEW events to the event listener.
+func TestSubscribeConsecutively(t *testing.T) {
+	maybeSkipIntegrationTest(t)
+
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+	defer s.Close()
+
+	if err := s.Subscribe("ike-updown", "child-updown"); err != nil {
+		t.Fatalf("Unexpected error subscribing for events: %v", err)
+	}
+
+	if !reflect.DeepEqual(s.el.events, []string{"ike-updown", "child-updown"}) {
+		t.Fatalf("Expected to find ike-updown and child-updown registered, got: %v", s.el.events)
+	}
+
+	if err := s.Subscribe("child-updown", "log", "ike-updown"); err != nil {
+		t.Fatalf("Unexpected error subscribing for additional events: %v", err)
+	}
+
+	// Only the 'log' event should have been added.
+	if !reflect.DeepEqual(s.el.events, []string{"ike-updown", "child-updown", "log"}) {
+		t.Fatalf("Expected to find ike-updown and child-updown registered, got: %v", s.el.events)
 	}
 }
