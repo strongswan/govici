@@ -28,16 +28,9 @@ package vici
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"net"
 	"sync"
-)
-
-var (
-	// Event listener errors
-	errNoEventListener     = errors.New("vici: event listener is not active")
-	errEventListenerExists = errors.New("vici: event listener already exists")
 )
 
 // Session is a vici client session.
@@ -51,10 +44,9 @@ type Session struct {
 	mux sync.Mutex
 	ctr *transport
 
-	// Allow many readers, i.e. NextEvent callers, to try to read from
-	// event listener. Writer lock is for creation and destruction of
-	// the event listener.
-	emux sync.RWMutex
+	// Make sure that only one goroutine can have an active call to
+	// subsribe/unsubscribe at a given time.
+	emux sync.Mutex
 	el   *eventListener
 
 	// Session options.
@@ -77,6 +69,13 @@ func NewSession(opts ...SessionOption) (*Session, error) {
 	}
 
 	s.ctr = ctr
+
+	elt, err := s.newTransport()
+	if err != nil {
+		return nil, err
+	}
+
+	s.el = newEventListener(elt)
 
 	return s, nil
 }
@@ -106,21 +105,10 @@ func (s *Session) newTransport() (*transport, error) {
 
 // Close closes the vici session.
 func (s *Session) Close() error {
-	// We can use the reader's lock to see if
-	// the event listener exists, and to close it.
-	//
-	// Use the writer's lock later to set the event
-	// listener to nil.
-	s.emux.RLock()
-	if s.el != nil {
-		if err := s.el.Close(); err != nil {
-			return err
-		}
-	}
-	s.emux.RUnlock()
-
 	s.emux.Lock()
-	s.el = nil
+	if err := s.el.Close(); err != nil {
+		return err
+	}
 	s.emux.Unlock()
 
 	s.mux.Lock()
@@ -210,46 +198,12 @@ func (s *Session) Subscribe(events ...string) error {
 	s.emux.Lock()
 	defer s.emux.Unlock()
 
-	if err := s.maybeCreateEventListener(); err != nil {
-		// If the event listener exists, just register the new events.
-		if err == errEventListenerExists {
-			return s.el.registerEvents(events)
-		}
-
-		return err
-	}
-
-	return s.el.listen(events)
-}
-
-func (s *Session) maybeCreateEventListener() error {
-	if s.el != nil {
-		if s.el.isActive() {
-			return errEventListenerExists
-		}
-	}
-
-	// Safe to create a new event listener...
-	elt, err := s.newTransport()
-	if err != nil {
-		return err
-	}
-
-	s.el = newEventListener(elt)
-
-	return nil
+	return s.el.registerEvents(events)
 }
 
 // NextEvent returns the next event received by the session event listener.  NextEvent is a
 // blocking call. If there is no event in the event buffer, NextEvent will wait to return until
 // a new event is received. An error is returned if the event channel is closed.
 func (s *Session) NextEvent(ctx context.Context) (Event, error) {
-	s.emux.RLock()
-	defer s.emux.RUnlock()
-
-	if s.el == nil {
-		return Event{}, errNoEventListener
-	}
-
 	return s.el.nextEvent(ctx)
 }
