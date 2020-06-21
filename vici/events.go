@@ -41,17 +41,13 @@ type eventListener struct {
 	ctx    context.Context
 	cancel context.CancelFunc
 
-	// Used in destroy() to signal that cleanup has finished.
-	//
-	// This pair is separate than the above ctx and cancel since
-	// cancel is used as the entry point to destroy, and so ctx.Done()
-	// would return before destroy has finished.
-	dctx    context.Context
-	dcancel context.CancelFunc
-
 	// Event channel and the events it's listening for.
 	ec     chan Event
 	events []string
+
+	// Packet channel used to communicate event registration
+	// results.
+	pc chan *packet
 }
 
 // Event represents an event received by a Session sent from the
@@ -70,109 +66,85 @@ type Event struct {
 
 func newEventListener(t *transport) *eventListener {
 	ctx, cancel := context.WithCancel(context.Background())
-	dctx, dcancel := context.WithCancel(context.Background())
 
-	return &eventListener{
+	el := &eventListener{
 		transport: t,
 		ctx:       ctx,
 		cancel:    cancel,
-		dctx:      dctx,
-		dcancel:   dcancel,
 		ec:        make(chan Event, 16),
+		pc:        make(chan *packet, 4),
 	}
+
+	go el.listen()
+
+	return el
 }
 
 // Close closes the event channel.
 func (el *eventListener) Close() error {
-	// Cancel the event listener context, and
-	// wait for the destroy context to be done.
-	el.cancel()
-
-	<-el.dctx.Done()
-
-	return nil
-}
-
-func (el *eventListener) isActive() bool {
-	if el.dctx == nil {
-		return false
-	}
-
-	select {
-	case <-el.dctx.Done():
-		// This case means the event listener has been
-		// destroy()'d, so it's no longer active.
-		return false
-
-	default:
-		// If these contexts are still active, then so is the
-		// event listener.
-		return true
-	}
-}
-
-func (el *eventListener) destroy() {
 	// This call interacts with charon, so get it
-	// done first. Then, the transport conn can
-	// be closed.
+	// done first. Then, we can stop the listen
+	// goroutine.
 	el.unregisterEvents(el.events)
+
+	// Cancel the event listener context, thus
+	// stopping the listen goroutine, and wait
+	// for the destroy context to be done.
+	el.cancel()
 	el.conn.Close()
 
-	// Close event channel. This ensures that any active
-	// calls to NextEvent will return.
-	close(el.ec)
-
-	// Finally, signal that destroy is finished. This MUST
-	// be done last, as it acts as a signal to Close that
-	// cleanup is done.
-	el.dcancel()
+	return nil
 }
 
-func (el *eventListener) listen(events []string) (err error) {
-	err = el.registerEvents(events)
-	if err != nil {
-		return err
-	}
+// listen is responsible for receiving all packets from the daemon. This includes
+// not only event packets, but event registration confirmations/errors.
+func (el *eventListener) listen() {
+	// Clean up the event channel when this loop is closed. This
+	// ensures any active NextEvent callers return.
+	defer close(el.ec)
 
-	go func() {
-		defer el.destroy()
+	for {
+		select {
+		case <-el.ctx.Done():
+			// Event listener is closing...
+			return
 
-		for {
-			select {
-			case <-el.ctx.Done():
-				// Closer context was cancelled.
-				return
-
-			default:
-				var e Event
-
-				// Set a read deadline so that this loop can continue
-				// at a reasonable pace. If the error is a timeout,
-				// do not send it on the event channel.
-				_ = el.conn.SetReadDeadline(time.Now().Add(time.Second))
-
-				p, err := el.recv()
-				if err != nil {
-					if ne, ok := err.(net.Error); ok && ne.Timeout() {
-						continue
-					}
-					e.err = err
-
-					// Send error event and continue in loop.
-					el.ec <- e
-					continue
-				}
-
-				if p.ptype == pktEvent {
-					e.Name = p.name
-					e.Message = p.msg
-					el.ec <- e
-				}
-			}
+		default:
+			// Try to read a packet...
 		}
-	}()
 
-	return nil
+		// Set a read deadline so that this loop can continue
+		// at a reasonable pace. If the error is a timeout,
+		// do not send it on the event channel.
+		_ = el.conn.SetReadDeadline(time.Now().Add(500 * time.Millisecond))
+
+		p, err := el.recv()
+		if err != nil {
+			if ne, ok := err.(net.Error); ok && ne.Timeout() {
+				continue
+			}
+
+			// Send error event and continue in loop.
+			el.ec <- Event{err: err}
+			continue
+		}
+
+		switch p.ptype {
+		case pktEvent:
+			e := Event{
+				Name:    p.name,
+				Message: p.msg,
+			}
+
+			el.ec <- e
+
+		// These SHOULD be in response to event registration
+		// requests from the event listener. Forward them over
+		// the packet channel.
+		case pktEventConfirm, pktEventUnknown:
+			el.pc <- p
+		}
+	}
 }
 
 func (el *eventListener) nextEvent(ctx context.Context) (Event, error) {
@@ -269,16 +241,15 @@ func (el *eventListener) eventTransportCommunicate(pkt *packet) (*packet, error)
 		return nil, err
 	}
 
-	// Refresh deadline for communication.
-	err = el.conn.SetReadDeadline(time.Now().Add(time.Second))
-	if err != nil {
-		return nil, err
-	}
+	// After the packet is sent, rely on the listen loop
+	// to communicate the response. Previously, the read
+	// deadline here was set to 1 second. Because this logic
+	// may prove fragile, add an extra second for cushion.
+	select {
+	case <-time.After(2 * time.Second):
+		return nil, errTransport
 
-	p, err := el.recv()
-	if err != nil {
-		return nil, err
+	case p := <-el.pc:
+		return p, nil
 	}
-
-	return p, nil
 }
