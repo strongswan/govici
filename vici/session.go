@@ -201,6 +201,26 @@ func (s *Session) Subscribe(events ...string) error {
 	return s.el.registerEvents(events)
 }
 
+// Unsubscribe unregisters the given events, so the session will no longer
+// receive events of the given type. If a given event is not valid, or the
+// session is not currently subscribed to a given event, there is no error
+// and nothing happens.
+func (s *Session) Unsubscribe(events ...string) {
+	s.emux.Lock()
+	defer s.emux.Unlock()
+
+	s.el.unregisterEvents(events)
+}
+
+// UnsubscribeAll unregisters all events that the session is currently
+// subscribed to.
+func (s *Session) UnsubscribeAll() {
+	s.emux.Lock()
+	defer s.emux.Unlock()
+
+	s.el.unregisterEvents(s.el.events)
+}
+
 // NextEvent returns the next event received by the session event listener.  NextEvent is a
 // blocking call. If there is no event in the event buffer, NextEvent will wait to return until
 // a new event is received. An error is returned if the event channel is closed.
