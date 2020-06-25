@@ -362,3 +362,40 @@ func TestSubscribeConsecutively(t *testing.T) {
 		t.Fatalf("Expected to find ike-updown and child-updown registered, got: %v", s.el.events)
 	}
 }
+
+// TestUnsubscribe makes sure that events of a given type are not
+// received after Unsubscribe is called.
+func TestUnsubscribe(t *testing.T) {
+	maybeSkipIntegrationTest(t)
+
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+	defer s.Close()
+
+	if err := s.Subscribe("log"); err != nil {
+		t.Fatalf("Failed to start event listener: %v", err)
+	}
+
+	if _, err := s.CommandRequest("reload-settings", nil); err != nil {
+		t.Fatalf("Failed to send 'reload-settings' command: %v", err)
+	}
+
+	_, err = s.NextEvent(context.TODO())
+	if err != nil {
+		t.Fatalf("Unexpected error waiting for event: %v", err)
+	}
+
+	s.Unsubscribe("log")
+
+	// Now, call reload-settings again and make sure no event is received.
+	// We'll say 3 seconds is enough to say the event was not received...
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+
+	_, err = s.NextEvent(ctx)
+	if err != ctx.Err() {
+		t.Fatalf("Expected to get timeout error since event should not be received, got: %v", err)
+	}
+}
