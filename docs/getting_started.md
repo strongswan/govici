@@ -148,7 +148,7 @@ func main() {
 
 ## Event Listener
 
-A `Session` can also be used to listen for specific server-issued events at any time, not only during streamed command requests. This is done with the `Session.Listen` function, which accepts a `context.Context` and a list of event types. As an example, say we wanted to create a routine to monitor the state of a given SA. We can register the `Session`'s event listener to listen for the `ike-updown` event like this:
+A `Session` can also be used to listen for specific server-issued events at any time, not only during streamed command requests. This is done with the `Session.Subscribe` function, which accepts a list of event types. As an example, say we wanted to create a routine to monitor the state of a given SA, as well as `log` events. We can register the `Session`'s event listener to listen for the `ike-updown` and `log` events like this:
 
 ```go
 package main
@@ -168,8 +168,8 @@ func main() {
 	}
 	defer session.Close()
 
-	// Register event listener for 'ike-updown' events.
-	if err := session.Listen(context.Background(), "ike-updown"); err != nil {
+	// Subscribe to 'ike-updown' and 'log' events.
+	if err := session.Subscribe("ike-updown", "log"); err != nil {
 		fmt.Println(err)
 		return
 	}
@@ -178,20 +178,28 @@ func main() {
 	name := "rw"
 
 	for {
-		e, err := session.NextEvent()
+		e, err := session.NextEvent(context.Background())
 		if err != nil {
 			fmt.Println(err)
 			return
 		}
 
-		state := e.Get(name).(*vici.Message).Get("state")
-
-		fmt.Printf("IKE SA state changed (name=%s): %s\n", name, state)
+                // The Event.Name field corresponds to the event name
+                // we used to make the subscription. The Event.Message
+                // field contains the Message from the server.
+                switch e.Name{
+                case "ike-updown":
+		        state := e.Message.Get(name).(*vici.Message).Get("state")
+		        fmt.Printf("IKE SA state changed (name=%s): %s\n", name, state)
+                case "log":
+                        // Log events contain a 'msg' field with the log message
+                        fmt.Println(e.Message.Get("msg"))
+                }
 	}
 }
 ```
 
-The `Session.NextEvent` function is used to read messages from the listener, and will block until the listener has received an event from the server.
+The `Session.NextEvent` function is used to read messages from the listener, and will block until the listener has received an event from the server, or until the supplied context is cancelled. Event subscriptions and unsubscriptions can be made at any time while the `Session` is active.
 
 ## Message Marshaling
 
