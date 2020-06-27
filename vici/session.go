@@ -206,9 +206,8 @@ func (s *Session) UnsubscribeAll() error {
 	return s.el.unregisterEvents(nil, true)
 }
 
-// NextEvent returns the next event received by the session event listener.  NextEvent is a
-// blocking call. If there is no event in the event buffer, NextEvent will wait to return until
-// a new event is received. An error is returned if the event channel is closed.
+// NextEvent returns the next event received by the session event listener.  NextEvent will block
+// until an Event (or error) is received, or until the supplied context is closed.
 func (s *Session) NextEvent(ctx context.Context) (Event, error) {
 	return s.el.nextEvent(ctx)
 }
