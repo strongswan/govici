@@ -68,7 +68,7 @@ func mockCharon(ctx context.Context) net.Conn {
 					return
 				}
 
-				if p.ptype == pktEventRegister {
+				if p.ptype == pktEventRegister && ack.ptype == pktEventConfirm {
 					// Write one event message
 					msg := NewMessage()
 					err := msg.Set("test", "hello world!")
@@ -154,6 +154,38 @@ func TestIdempotentSessionClose(t *testing.T) {
 
 	if err := s.Close(); err != nil {
 		t.Fatalf("Unpexected error when closing Session (second close): %v", err)
+	}
+}
+
+// TestNextEventAfterFailedSubscribe makes sure that a packet read
+// error that occurred while no events are registered, e.g. during
+// the first call to subscribe, are not propagated to subsequent
+// calls to NextEvent.
+func TestNextEventAfterFailedSubscribe(t *testing.T) {
+	dctx, dcancel := context.WithCancel(context.Background())
+	defer dcancel()
+
+	conn := mockCharon(dctx)
+
+	s, err := NewSession(withTestConn(conn))
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+	defer s.Close()
+
+	// This should result in an IO error, and if handled properly within
+	// the event listener, the error should not be sent on the event channel.
+	s.el.conn.Close()
+	if err := s.Subscribe("test-event"); err == nil {
+		t.Fatalf("Expected error reading from closed transport")
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+	defer cancel()
+
+	_, err = s.NextEvent(ctx)
+	if err != ctx.Err() {
+		t.Fatalf("Expected to get timeout error, got: %v", err)
 	}
 }
 
@@ -387,7 +419,9 @@ func TestUnsubscribe(t *testing.T) {
 		t.Fatalf("Unexpected error waiting for event: %v", err)
 	}
 
-	s.Unsubscribe("log")
+	if err := s.Unsubscribe("log"); err != nil {
+		t.Fatalf("Unexpected error unsubscribing from 'log' event: %v", err)
+	}
 
 	// Now, call reload-settings again and make sure no event is received.
 	// We'll say 3 seconds is enough to say the event was not received...

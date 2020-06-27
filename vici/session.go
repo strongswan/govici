@@ -44,10 +44,7 @@ type Session struct {
 	mux sync.Mutex
 	ctr *transport
 
-	// Make sure that only one goroutine can have an active call to
-	// subsribe/unsubscribe at a given time.
-	emux sync.Mutex
-	el   *eventListener
+	el *eventListener
 
 	// Session options.
 	*sessionOpts
@@ -105,11 +102,9 @@ func (s *Session) newTransport() (*transport, error) {
 
 // Close closes the vici session.
 func (s *Session) Close() error {
-	s.emux.Lock()
 	if err := s.el.Close(); err != nil {
 		return err
 	}
-	s.emux.Unlock()
 
 	s.mux.Lock()
 	if s.ctr != nil {
@@ -195,30 +190,20 @@ func (s *Session) StreamedCommandRequest(cmd string, event string, msg *Message)
 // events that are registered here, use NextEvent. An error is returned if
 // Subscribe is not able to register the given events with the charon daemon.
 func (s *Session) Subscribe(events ...string) error {
-	s.emux.Lock()
-	defer s.emux.Unlock()
-
 	return s.el.registerEvents(events)
 }
 
 // Unsubscribe unregisters the given events, so the session will no longer
-// receive events of the given type. If a given event is not valid, or the
-// session is not currently subscribed to a given event, there is no error
-// and nothing happens.
-func (s *Session) Unsubscribe(events ...string) {
-	s.emux.Lock()
-	defer s.emux.Unlock()
-
-	s.el.unregisterEvents(events)
+// receive events of the given type. If a given event is not valid, an error
+// is retured.
+func (s *Session) Unsubscribe(events ...string) error {
+	return s.el.unregisterEvents(events, false)
 }
 
 // UnsubscribeAll unregisters all events that the session is currently
 // subscribed to.
-func (s *Session) UnsubscribeAll() {
-	s.emux.Lock()
-	defer s.emux.Unlock()
-
-	s.el.unregisterEvents(s.el.events)
+func (s *Session) UnsubscribeAll() error {
+	return s.el.unregisterEvents(nil, true)
 }
 
 // NextEvent returns the next event received by the session event listener.  NextEvent is a
