@@ -25,6 +25,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"sync"
 	"time"
 )
 
@@ -42,12 +43,17 @@ type eventListener struct {
 	cancel context.CancelFunc
 
 	// Event channel and the events it's listening for.
-	ec     chan Event
+	ec chan Event
+
+	// The listen goroutune reads events, and the
+	// register/unregisterEvent functions write to events.
+	emux   sync.Mutex
 	events []string
 
 	// Packet channel used to communicate event registration
 	// results.
-	pc chan *packet
+	pc   chan *packet
+	perr chan error
 }
 
 // Event represents an event received by a Session sent from the
@@ -73,6 +79,7 @@ func newEventListener(t *transport) *eventListener {
 		cancel:    cancel,
 		ec:        make(chan Event, 16),
 		pc:        make(chan *packet, 4),
+		perr:      make(chan error, 1),
 	}
 
 	go el.listen()
@@ -85,7 +92,9 @@ func (el *eventListener) Close() error {
 	// This call interacts with charon, so get it
 	// done first. Then, we can stop the listen
 	// goroutine.
-	el.unregisterEvents(el.events)
+	if err := el.unregisterEvents(nil, true); err != nil {
+		return err
+	}
 
 	// Cancel the event listener context, thus
 	// stopping the listen goroutine, and wait
@@ -124,8 +133,31 @@ func (el *eventListener) listen() {
 				continue
 			}
 
-			// Send error event and continue in loop.
-			el.ec <- Event{err: err}
+			// If there is an error already buffered, that means there
+			// was no eventTransportCommunicate caller to read it. The
+			// buffer size is only 1, so flush before writing.
+			select {
+			case <-el.perr:
+			default:
+			}
+			el.perr <- err
+
+			// It is worth pointing out that the order of sending packet errors
+			// versus sending errors over the event channel is significant. While
+			// deadlock will _not_ occur due to the timeout in eventTransportCommunicate,
+			// the _wrong_ error would be returned by the aforementioned function. If these
+			// blocks were reverse, the code execution would continue on, but the emux would
+			// be free _only_ because of the time.After in eventTransportCommunicate.
+			//
+			// If there are no events currently registered, there is no
+			// point in sending errors on the event channel. The error
+			// must be for a event registration.
+			el.emux.Lock()
+			if len(el.events) > 0 {
+				el.ec <- Event{err: err}
+			}
+			el.emux.Unlock()
+
 			continue
 		}
 
@@ -165,6 +197,9 @@ func (el *eventListener) nextEvent(ctx context.Context) (Event, error) {
 }
 
 func (el *eventListener) registerEvents(events []string) error {
+	el.emux.Lock()
+	defer el.emux.Unlock()
+
 	for _, event := range events {
 		// Check if the event is already registered.
 		exists := false
@@ -194,10 +229,18 @@ func (el *eventListener) registerEvents(events []string) error {
 	return nil
 }
 
-func (el *eventListener) unregisterEvents(events []string) {
+func (el *eventListener) unregisterEvents(events []string, all bool) error {
+	el.emux.Lock()
+	defer el.emux.Unlock()
+
+	if all {
+		events = el.events
+	}
+
 	for _, e := range events {
-		// nolint
-		el.eventRegisterUnregister(e, false)
+		if err := el.eventRegisterUnregister(e, false); err != nil {
+			return err
+		}
 
 		for i, registered := range el.events {
 			if e != registered {
@@ -211,6 +254,8 @@ func (el *eventListener) unregisterEvents(events []string) {
 			break
 		}
 	}
+
+	return nil
 }
 
 func (el *eventListener) eventRegisterUnregister(event string, register bool) error {
@@ -236,6 +281,17 @@ func (el *eventListener) eventRegisterUnregister(event string, register bool) er
 }
 
 func (el *eventListener) eventTransportCommunicate(pkt *packet) (*packet, error) {
+	// If an error was sent over this channel while a
+	// transport communication was not active, flush
+	// it out quick before sending the packet.
+	//
+	// The channel buffer is only 1, so if there is an
+	// error buffered, it is the _only_ error buffered.
+	select {
+	case <-el.perr:
+	default:
+	}
+
 	err := el.send(pkt)
 	if err != nil {
 		return nil, err
@@ -248,6 +304,9 @@ func (el *eventListener) eventTransportCommunicate(pkt *packet) (*packet, error)
 	select {
 	case <-time.After(2 * time.Second):
 		return nil, errTransport
+
+	case err := <-el.perr:
+		return nil, err
 
 	case p := <-el.pc:
 		return p, nil
