@@ -33,6 +33,8 @@ import (
 	"sync"
 )
 
+var defaultDialer net.Dialer
+
 // Session is a vici client session.
 type Session struct {
 	// Only one command can be active on the transport at a time,
@@ -84,11 +86,17 @@ func (s *Session) newTransport() (*transport, error) {
 		return &transport{conn: s.conn}, nil
 	}
 
-	if s.path == "" {
-		s.path = defaultSocketPath
+	if s.network == "" {
+		s.network = "unix"
+	}
+	if s.addr == "" {
+		s.addr = defaultSocketPath
+	}
+	if s.dialer == nil {
+		s.dialer = defaultDialer.DialContext
 	}
 
-	conn, err := net.Dial("unix", s.path)
+	conn, err := s.dialer(context.Background(), s.network, s.addr)
 	if err != nil {
 		return nil, fmt.Errorf("%v: %v", errTransport, err)
 	}
@@ -126,8 +134,12 @@ type SessionOption interface {
 }
 
 type sessionOpts struct {
-	// Path to vici socket, defaults to /var/run/charon.vici.
-	path string
+	// Network and address to use to connect to the vici socket,
+	// defaults to "unix" & "/var/run/charon.vici".
+	network, addr string
+
+	// The context dial func to use when dialing the charon socket.
+	dialer func(ctx context.Context, network, addr string) (net.Conn, error)
 
 	// A net.Conn to use, instead of dialing a unix socket.
 	//
@@ -152,7 +164,29 @@ func newFuncSessionOption(f func(*sessionOpts)) *funcSessionOption {
 // path, /var/run/charon.vici, is used.
 func WithSocketPath(path string) SessionOption {
 	return newFuncSessionOption(func(so *sessionOpts) {
-		so.path = path
+		so.network = "unix"
+		so.addr = path
+	})
+}
+
+// WithAddr specifies the network and address of the socket that charon
+// is listening on. If this option is not specified, the default
+// path, /var/run/charon.vici, is used.
+//
+// As the protocol itself currently does not provide any security or
+// authentication properties, it is recommended to run it over a UNIX
+// socket with appropriate permissions.
+func WithAddr(network, addr string) SessionOption {
+	return newFuncSessionOption(func(so *sessionOpts) {
+		so.network = network
+		so.addr = addr
+	})
+}
+
+// WithDialer specifies the dial func to use when dialing the charon socket.
+func WithDialer(dialer func(ctx context.Context, network, addr string) (net.Conn, error)) SessionOption {
+	return newFuncSessionOption(func(so *sessionOpts) {
+		so.dialer = dialer
 	})
 }
 
