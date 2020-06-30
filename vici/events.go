@@ -67,6 +67,10 @@ type Event struct {
 	// Message is the Message associated with this event.
 	Message *Message
 
+	// Timestamp holds the timestamp of when the client
+	// received the event.
+	Timestamp time.Time
+
 	err error
 }
 
@@ -161,11 +165,14 @@ func (el *eventListener) listen() {
 			continue
 		}
 
+		ts := time.Now()
+
 		switch p.ptype {
 		case pktEvent:
 			e := Event{
-				Name:    p.name,
-				Message: p.msg,
+				Name:      p.name,
+				Message:   p.msg,
+				Timestamp: ts,
 			}
 
 			el.ec <- e
