@@ -33,8 +33,6 @@ import (
 	"sync"
 )
 
-var defaultDialer net.Dialer
-
 // Session is a vici client session.
 type Session struct {
 	// Only one command can be active on the transport at a time,
@@ -93,7 +91,7 @@ func (s *Session) newTransport() (*transport, error) {
 		s.addr = defaultSocketPath
 	}
 	if s.dialer == nil {
-		s.dialer = defaultDialer.DialContext
+		s.dialer = net.Dialer{}.DialContext
 	}
 
 	conn, err := s.dialer(context.Background(), s.network, s.addr)
@@ -183,8 +181,8 @@ func WithAddr(network, addr string) SessionOption {
 	})
 }
 
-// WithDialer specifies the dial func to use when dialing the charon socket.
-func WithDialer(dialer func(ctx context.Context, network, addr string) (net.Conn, error)) SessionOption {
+// WithDialContext specifies the dial func to use when dialing the charon socket.
+func WithDialContext(dialer func(ctx context.Context, network, addr string) (net.Conn, error)) SessionOption {
 	return newFuncSessionOption(func(so *sessionOpts) {
 		so.dialer = dialer
 	})
