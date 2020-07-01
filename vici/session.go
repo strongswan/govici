@@ -91,7 +91,7 @@ func (s *Session) newTransport() (*transport, error) {
 		s.addr = defaultSocketPath
 	}
 	if s.dialer == nil {
-		s.dialer = net.Dialer{}.DialContext
+		s.dialer = (&net.Dialer{}).DialContext
 	}
 
 	conn, err := s.dialer(context.Background(), s.network, s.addr)
