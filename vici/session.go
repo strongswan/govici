@@ -53,7 +53,14 @@ type Session struct {
 // NewSession returns a new vici session.
 func NewSession(opts ...SessionOption) (*Session, error) {
 	s := &Session{
-		sessionOpts: &sessionOpts{},
+		// Set default session opts before applying
+		// the opts passed by the caller.
+		sessionOpts: &sessionOpts{
+			network: "unix",
+			addr:    defaultSocketPath,
+			dialer:  (&net.Dialer{}).DialContext,
+			conn:    nil,
+		},
 	}
 
 	for _, opt := range opts {
@@ -82,16 +89,6 @@ func (s *Session) newTransport() (*transport, error) {
 	// Check if a net.Conn was supplied already (testing only).
 	if s.conn != nil {
 		return &transport{conn: s.conn}, nil
-	}
-
-	if s.network == "" {
-		s.network = "unix"
-	}
-	if s.addr == "" {
-		s.addr = defaultSocketPath
-	}
-	if s.dialer == nil {
-		s.dialer = (&net.Dialer{}).DialContext
 	}
 
 	conn, err := s.dialer(context.Background(), s.network, s.addr)
@@ -134,7 +131,8 @@ type SessionOption interface {
 type sessionOpts struct {
 	// Network and address to use to connect to the vici socket,
 	// defaults to "unix" & "/var/run/charon.vici".
-	network, addr string
+	network string
+	addr    string
 
 	// The context dial func to use when dialing the charon socket.
 	dialer func(ctx context.Context, network, addr string) (net.Conn, error)
