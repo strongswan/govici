@@ -25,6 +25,7 @@ import (
 	"flag"
 	"log"
 	"net"
+	"os/exec"
 	"reflect"
 	"testing"
 	"time"
@@ -432,4 +433,34 @@ func TestUnsubscribe(t *testing.T) {
 	if err != ctx.Err() {
 		t.Fatalf("Expected to get timeout error since event should not be received, got: %v", err)
 	}
+}
+
+// TestCloseAfterEOF provides a regression test for
+// https://github.com/strongswan/govici/issues/24.
+//
+// Register an event, and then systemctl stop strongswan to
+// kill the transport.
+func TestCloseAfterEOF(t *testing.T) {
+	maybeSkipIntegrationTest(t)
+
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+	defer s.Close()
+
+	if err := s.Subscribe("log"); err != nil {
+		t.Fatalf("Failed to subscribe to event: %v", err)
+	}
+
+	err = exec.Command("systemctl", "stop", "strongswan").Run()
+	if err != nil {
+		t.Fatalf("Failed to stop strongswan: %v", err)
+	}
+	defer func() {
+		err := exec.Command("systemctl", "start", "strongswan").Run()
+		if err != nil {
+			t.Fatalf("Failed to restart strongswan: %v", err)
+		}
+	}()
 }
