@@ -25,6 +25,7 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 )
 
@@ -80,9 +81,14 @@ func (t *transport) recv() (*packet, error) {
 
 	_, err := t.conn.Read(buf)
 	if err != nil {
+		if err == io.EOF {
+			return nil, err
+		}
+
 		if ne, ok := err.(net.Error); ok && ne.Timeout() {
 			return nil, ne
 		}
+
 		return nil, fmt.Errorf("%v: %v", errTransport, err)
 	}
 	pl := binary.BigEndian.Uint32(buf)
@@ -90,6 +96,14 @@ func (t *transport) recv() (*packet, error) {
 	buf = make([]byte, int(pl))
 	_, err = t.conn.Read(buf)
 	if err != nil {
+		if err == io.EOF {
+			return nil, err
+		}
+
+		if ne, ok := err.(net.Error); ok && ne.Timeout() {
+			return nil, ne
+		}
+
 		return nil, fmt.Errorf("%v: %v", errTransport, err)
 	}
 

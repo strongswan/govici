@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"net"
 	"sync"
 	"time"
@@ -161,6 +162,16 @@ func (el *eventListener) listen() {
 				el.ec <- Event{err: err}
 			}
 			el.emux.Unlock()
+
+			// If we got EOF, then the event listener transport
+			// has been closed (by a stopped daemon or otherwise),
+			// and all subsequent calls to recv() will result in
+			// the same error. Time to break out of the loop.
+			//
+			// See https://github.com/strongswan/govici/issues/24.
+			if err == io.EOF {
+				return
+			}
 
 			continue
 		}
