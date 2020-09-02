@@ -335,7 +335,7 @@ type connection struct {
 Then, we need to define `localOpts` and `remoteOpts` as referenced in the above definition:
 
 ```go
-type localsOpts struct {
+type localOpts struct {
 	Auth  string   `vici:"auth"`
 	Certs []string `vici:"certs"`
 	ID    string   `vici:"id"`
