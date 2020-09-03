@@ -345,3 +345,84 @@ func TestUnmarshalEmbeddedStruct(t *testing.T) {
 		t.Fatalf("Unmarshalled embedded value is invalid.\nExpected: %+v\nReceived: %+v", testValue, embeddedMessage.Field)
 	}
 }
+
+func TestUnmarshalInline(t *testing.T) {
+	testValue := "unmarshal-inline"
+
+	type Embedded struct {
+		Field string `vici:"field"`
+	}
+
+	inlineMessage := struct {
+		Embedded `vici:",inline"`
+	}{}
+
+	m := &Message{
+		[]string{"field"},
+		map[string]interface{}{
+			"field": testValue,
+		},
+	}
+
+	err := UnmarshalMessage(m, &inlineMessage)
+	if err != nil {
+		t.Fatalf("Error unmarshalling into inlined embedded struct: %v", err)
+	}
+
+	if inlineMessage.Field != testValue {
+		t.Fatalf("Unmarshalled inlined embedded value is invalid.\nExpected: %+v\nReceived: %+v", testValue, inlineMessage.Field)
+	}
+}
+
+func TestUnmarshalInlineInvalidType(t *testing.T) {
+	inlineMessage := struct {
+		Field string `vici:",inline"`
+	}{}
+
+	m := &Message{
+		[]string{"field"},
+		map[string]interface{}{
+			"field": "test-value",
+		},
+	}
+
+	err := UnmarshalMessage(m, &inlineMessage)
+	if err == nil {
+		t.Error("Expected error when unmarshalling invalid inlined embedded type. None was returned.")
+	}
+}
+
+func TestUnmarshalInlineComposite(t *testing.T) {
+	testValue := "unmarshal-inline-composite"
+	otherValue := "other-value"
+
+	type Embedded struct {
+		Field string `vici:"field"`
+	}
+
+	inlineMessage := struct {
+		Embedded `vici:",inline"`
+		Other    string `vici:"other"`
+	}{}
+
+	m := &Message{
+		[]string{"field", "other"},
+		map[string]interface{}{
+			"field": testValue,
+			"other": otherValue,
+		},
+	}
+
+	err := UnmarshalMessage(m, &inlineMessage)
+	if err != nil {
+		t.Fatalf("Error unmarshalling into inlined embedded struct: %v", err)
+	}
+
+	if inlineMessage.Field != testValue {
+		t.Fatalf("Unmarshalled inlined embedded value is invalid.\nExpected: %+v\nReceived: %+v", testValue, inlineMessage.Field)
+	}
+
+	if inlineMessage.Other != otherValue {
+		t.Fatalf("Unmarshalled inlined embedded value is invalid.\nExpected: %+v\nReceived: %+v", otherValue, inlineMessage.Other)
+	}
+}

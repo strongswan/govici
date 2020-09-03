@@ -25,6 +25,74 @@ import (
 	"testing"
 )
 
+func TestMarshalTagSkip(t *testing.T) {
+	skipMessage := struct {
+		Skipped string `vici:""`
+	}{
+		Skipped: "skipped",
+	}
+
+	m, err := MarshalMessage(skipMessage)
+	if err != nil {
+		t.Fatalf("Error marshalling skipped value: %v", err)
+	}
+
+	if len(m.Keys()) != 0 {
+		t.Fatalf("Marshalled message has keys.\nExpected: 0\nReceived: %d", len(m.Keys()))
+	}
+}
+
+func TestMarshalTagSkipDash(t *testing.T) {
+	skipMessage := struct {
+		Skipped string `vici:"-"`
+	}{
+		Skipped: "skipped",
+	}
+
+	m, err := MarshalMessage(skipMessage)
+	if err != nil {
+		t.Fatalf("Error marshalling skipped value: %v", err)
+	}
+
+	if len(m.Keys()) != 0 {
+		t.Fatalf("Marshalled message has keys.\nExpected: 0\nReceived: %d", len(m.Keys()))
+	}
+}
+
+func TestMarshalTagSkipWithOpt(t *testing.T) {
+	skipMessage := struct {
+		Skipped string `vici:",testOpt"`
+	}{
+		Skipped: "skipped",
+	}
+
+	m, err := MarshalMessage(skipMessage)
+	if err != nil {
+		t.Fatalf("Error marshalling skipped value: %v", err)
+	}
+
+	if len(m.Keys()) != 0 {
+		t.Fatalf("Marshalled message has keys.\nExpected: 0\nReceived: %d", len(m.Keys()))
+	}
+}
+
+func TestMarshalTagSkipDashWithOpt(t *testing.T) {
+	skipMessage := struct {
+		Skipped string `vici:"-,testOpt"`
+	}{
+		Skipped: "skipped",
+	}
+
+	m, err := MarshalMessage(skipMessage)
+	if err != nil {
+		t.Fatalf("Error marshalling skipped value: %v", err)
+	}
+
+	if len(m.Keys()) != 0 {
+		t.Fatalf("Marshalled message has keys.\nExpected: 0\nReceived: %d", len(m.Keys()))
+	}
+}
+
 func TestMarshalBoolTrue(t *testing.T) {
 	boolMessage := struct {
 		Field bool `vici:"field"`
@@ -281,5 +349,74 @@ func TestMarshalEmbeddedStruct(t *testing.T) {
 	value = embedded.Get("field")
 	if !reflect.DeepEqual(value, testValue) {
 		t.Fatalf("Marshalled embedded struct value is invalid.\nExpected: %+v\nReceived: %+v", testValue, value)
+	}
+}
+
+func TestMarshalInline(t *testing.T) {
+	testValue := "marshal-inline"
+
+	type Embedded struct {
+		Field string `vici:"field"`
+	}
+
+	inlineMessage := struct {
+		Embedded `vici:",inline"`
+	}{}
+
+	inlineMessage.Field = testValue
+
+	m, err := MarshalMessage(inlineMessage)
+	if err != nil {
+		t.Fatalf("Error marshalling inlined embedded struct: %v", err)
+	}
+
+	value := m.Get("field")
+	if !reflect.DeepEqual(value, testValue) {
+		t.Fatalf("Marshalled inlined embedded value is invalid.\nExpected: %+v\nReceived: %+v", testValue, value)
+	}
+}
+
+func TestMarshalInlineInvalidType(t *testing.T) {
+	inlineMessage := struct {
+		Field string `vici:",inline"`
+	}{}
+
+	inlineMessage.Field = "inline-value"
+
+	_, err := MarshalMessage(inlineMessage)
+	if err == nil {
+		t.Error("Expected error when marshalling invalid inlined embedded type. None was returned.")
+	}
+}
+
+func TestMarshalInlineComposite(t *testing.T) {
+	testValue := "marshal-inline-composite"
+	otherValue := "other-value"
+
+	type Embedded struct {
+		Field string `vici:"field"`
+	}
+
+	inlineMessage := struct {
+		Embedded `vici:",inline"`
+		Other    string `vici:"other"`
+	}{}
+
+	inlineMessage.Field = testValue
+	inlineMessage.Other = otherValue
+
+	m, err := MarshalMessage(inlineMessage)
+	if err != nil {
+		t.Fatalf("Error marshalling inlined embedded struct: %v", err)
+	}
+
+	value := m.Get("field")
+	if !reflect.DeepEqual(value, testValue) {
+		t.Fatalf("Marshalled inlined embedded value is invalid.\nExpected: %+v\nReceived: %+v", testValue, value)
+	}
+
+	value = m.Get("other")
+	if !reflect.DeepEqual(value, otherValue) {
+		t.Fatalf("Marshalled inlined embedded value is invalid.\nExpected: %+v\nReceived: %+v", otherValue, value)
 	}
 }
