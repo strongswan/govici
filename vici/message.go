@@ -125,10 +125,14 @@ func NewMessage() *Message {
 // struct, or struct pointer.
 //
 // If v is a map, the map's key type must be a string, and the type of the corresponding map element
-// must be supported by Message.Set or MarshalMessage itself. If v is a struct or points to one, fields
-// are only marshaled if they are exported and explicitly have a vici struct tag set. In these cases,
-// the struct tag defines the key used for that field in the Message, and the field type must be supported
-// by Message.Set or MarshalMessage itself.
+// must be supported by Message.Set or MarshalMessage itself.
+//
+// If v is a struct or points to one, fields are only marshaled if they are exported and explicitly
+// have a vici struct tag set. In these cases, the struct tag defines the key used for that field in
+// the Message, and the field type must be supported by Message.Set or MarshalMessage itself.
+// Embedded structs may be used as fields, either by explicitly giving them a field name with the vici
+// struct tag, or by marking them as inline. Inlined structs are defined by using the opt "inline"
+// on the vici tag, for example: `vici:",inline"`.
 func MarshalMessage(v interface{}) (*Message, error) {
 	m := NewMessage()
 	if err := m.marshal(v); err != nil {
@@ -140,7 +144,8 @@ func MarshalMessage(v interface{}) (*Message, error) {
 
 // UnmarshalMessage unmarshals m to a map or struct (or struct pointer).
 // When unmarshaling to a struct, only exported fields with a vici struct tag
-// explicitly set are unmarshaled.
+// explicitly set are unmarshaled. Struct fields can be unmarshaled inline
+// by providing the opt "inline" to the vici struct tag.
 //
 // An error is returned if the underlying value of v cannot be unmarshaled into, or
 // an unsupported type is encountered.
@@ -729,18 +734,31 @@ func (m *Message) decodeSection(data []byte) (int, error) {
 
 // messageTag is used for parsing struct tags in marshaling Messages
 type messageTag struct {
-	name string
-
-	skip bool
+	name   string
+	skip   bool
+	inline bool
 }
 
 func newMessageTag(tag reflect.StructTag) messageTag {
 	t := tag.Get("vici")
-	if t == "-" || t == "" {
+
+	opts := strings.Split(t, ",")
+	if len(opts) == 0 {
 		return messageTag{skip: true}
 	}
 
-	return messageTag{name: t}
+	mt := messageTag{name: opts[0]}
+	for _, opt := range opts[1:] {
+		if opt == "inline" {
+			mt.inline = true
+		}
+	}
+
+	if (!mt.inline && mt.name == "") || mt.name == "-" {
+		mt.skip = true
+	}
+
+	return mt
 }
 
 func emptyMessageElement(rv reflect.Value) bool {
@@ -796,6 +814,18 @@ func (m *Message) marshalFromStruct(rv reflect.Value) error {
 
 		rfv := rv.Field(i)
 		if !rfv.CanInterface() {
+			continue
+		}
+
+		if mt.inline {
+			if rfv.Kind() != reflect.Struct {
+				return fmt.Errorf("%v: cannot marshal non-struct inlined field %v", errMarshalUnsupportedType, rv.Kind())
+			}
+
+			err := m.marshalFromStruct(rfv)
+			if err != nil {
+				return err
+			}
 			continue
 		}
 
@@ -907,13 +937,25 @@ func (m *Message) unmarshalToStruct(rv reflect.Value) error {
 		rf := rt.Field(i)
 		tag := newMessageTag(rf.Tag)
 
-		value, ok := m.data[tag.name]
-		if !ok {
+		rfv := rv.Field(i)
+		if !rfv.CanInterface() {
 			continue
 		}
 
-		rfv := rv.Field(i)
-		if !rfv.CanInterface() {
+		if tag.inline {
+			if rfv.Kind() != reflect.Struct {
+				return fmt.Errorf("%v: cannot unmarshal into non-struct inlined field %v", errUnmarshalUnsupportedType, rv.Kind())
+			}
+
+			err := m.unmarshalToStruct(rfv)
+			if err != nil {
+				return err
+			}
+			continue
+		}
+
+		value, ok := m.data[tag.name]
+		if !ok {
 			continue
 		}
 
