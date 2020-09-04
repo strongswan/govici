@@ -253,3 +253,33 @@ func TestMarshalEmbeddedMap(t *testing.T) {
 		t.Fatalf("Marshalled map value is invalid.\nExpected: %+v\nReceived: %+v", goldMarshaled, value)
 	}
 }
+
+func TestMarshalEmbeddedStruct(t *testing.T) {
+	const testValue = "marshalled-embedded-value"
+
+	type Embedded struct {
+		Field string `vici:"field"`
+	}
+
+	embeddedMessage := struct {
+		Embedded `vici:"embedded"`
+	}{}
+
+	embeddedMessage.Field = testValue
+
+	m, err := MarshalMessage(embeddedMessage)
+	if err != nil {
+		t.Fatalf("Errorf marshalling embedded struct: %v", err)
+	}
+
+	value := m.Get("embedded")
+	embedded, ok := value.(*Message)
+	if !ok {
+		t.Fatalf("Embedded struct was not marshalled as a sub-message")
+	}
+
+	value = embedded.Get("field")
+	if !reflect.DeepEqual(value, testValue) {
+		t.Fatalf("Marshalled embedded struct value is invalid.\nExpected: %+v\nReceived: %+v", testValue, value)
+	}
+}
