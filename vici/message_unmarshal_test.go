@@ -312,3 +312,36 @@ func TestUnmarshalEnumType(t *testing.T) {
 		t.Fatalf("Unmarshalled uint value is invalid.\nExpected: %+v\nReceived: %+v", testValue, enumMessage.Field)
 	}
 }
+
+func TestUnmarshalEmbeddedStruct(t *testing.T) {
+	const testValue = "unmarshalled-embedded-value"
+
+	type Embedded struct {
+		Field string `vici:"field"`
+	}
+
+	embeddedMessage := struct {
+		Embedded `vici:"embedded"`
+	}{}
+
+	m := &Message{
+		[]string{"embedded"},
+		map[string]interface{}{
+			"embedded": &Message{
+				[]string{"field"},
+				map[string]interface{}{
+					"field": testValue,
+				},
+			},
+		},
+	}
+
+	err := UnmarshalMessage(m, &embeddedMessage)
+	if err != nil {
+		t.Fatalf("Error unmarshalling into embedded struct: %v", err)
+	}
+
+	if embeddedMessage.Field != testValue {
+		t.Fatalf("Unmarshalled embedded value is invalid.\nExpected: %+v\nReceived: %+v", testValue, embeddedMessage.Field)
+	}
+}
