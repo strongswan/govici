@@ -133,6 +133,13 @@ func NewMessage() *Message {
 // Embedded structs may be used as fields, either by explicitly giving them a field name with the vici
 // struct tag, or by marking them as inline. Inlined structs are defined by using the opt "inline"
 // on the vici tag, for example: `vici:",inline"`.
+//
+// Any field that would be encoded as an empty message element is always omitted during marshaling. However,
+// "empty message element" is not necessarily analogous to a type's zero value in Go. Because all supported
+// Go types are marshaled to either string, []string, or *Message, a field is considered an empty message
+// element if it would be encoded as either an empty string, zero-length []string or nil. On the other hand,
+// an integer's zero value is 0, but this is marshaled to the string "0", and will not be omitted from marshaling.
+// Likewise, a bool's zero value is false, which is marshaled to the string "no".
 func MarshalMessage(v interface{}) (*Message, error) {
 	m := NewMessage()
 	if err := m.marshal(v); err != nil {
@@ -764,7 +771,7 @@ func newMessageTag(tag reflect.StructTag) messageTag {
 func emptyMessageElement(rv reflect.Value) bool {
 	switch rv.Kind() {
 	case reflect.Slice:
-		return rv.IsNil()
+		return rv.IsNil() || rv.Len() == 0
 
 	case reflect.Struct:
 		z := true
@@ -778,6 +785,18 @@ func emptyMessageElement(rv reflect.Value) bool {
 
 	case reflect.Map:
 		return rv.IsNil() || len(rv.MapKeys()) == 0
+
+	// The rest of the types checked here are ALWAYS considered non-empty, because
+	// they will be encoded in their appropriate string representations, which are
+	// always non-empty.
+	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
+		return false
+
+	case reflect.Uint, reflect.Uint8, reflect.Uint16, reflect.Uint32, reflect.Uint64:
+		return false
+
+	case reflect.Bool:
+		return false
 	}
 
 	return false
