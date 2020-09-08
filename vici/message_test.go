@@ -614,3 +614,60 @@ func ExampleMessage_Set() {
 	fmt.Printf("%v, %v, %v\n", m.Get("version"), m.Get("mobike"), m.Get("local_addrs"))
 	// Output: 2, no, [192.168.0.1/24]
 }
+
+func TestEmptyMessageElement(t *testing.T) {
+	elements := map[reflect.Value]bool{
+		/* bool's should never be empty */
+		reflect.ValueOf(false): false,
+		reflect.ValueOf(true):  false,
+		/* integer types should never be empty */
+		reflect.ValueOf(int(0)):    false,
+		reflect.ValueOf(int(1)):    false,
+		reflect.ValueOf(int8(0)):   false,
+		reflect.ValueOf(int8(1)):   false,
+		reflect.ValueOf(int16(0)):  false,
+		reflect.ValueOf(int16(1)):  false,
+		reflect.ValueOf(int32(0)):  false,
+		reflect.ValueOf(int32(1)):  false,
+		reflect.ValueOf(int64(0)):  false,
+		reflect.ValueOf(int64(1)):  false,
+		reflect.ValueOf(uint(0)):   false,
+		reflect.ValueOf(uint(1)):   false,
+		reflect.ValueOf(uint8(0)):  false,
+		reflect.ValueOf(uint8(1)):  false,
+		reflect.ValueOf(uint16(0)): false,
+		reflect.ValueOf(uint16(1)): false,
+		reflect.ValueOf(uint32(0)): false,
+		reflect.ValueOf(uint32(1)): false,
+		reflect.ValueOf(uint64(0)): false,
+		reflect.ValueOf(uint64(1)): false,
+		/* empty strings should be empty, otherwise not */
+		reflect.ValueOf(""):     true,
+		reflect.ValueOf("test"): false,
+		/* nil or zero-length slices should be empty */
+		reflect.ValueOf([]string{"test1", "test2"}): false,
+		reflect.ValueOf([]string{}):                 true,
+		reflect.ValueOf([]string(nil)):              true,
+		/* nil or zero-length maps should be empty */
+		reflect.ValueOf(map[string]interface{}{"test": 0}): false,
+		reflect.ValueOf(map[string]interface{}{}):          true,
+		reflect.ValueOf(map[string]interface{}(nil)):       true,
+		/* a struct is empty if each of its fields are empty */
+		reflect.ValueOf(struct{ Test string }{"test"}): false,
+		reflect.ValueOf(struct{ Test string }{}):       true,
+		/* nil pointers should be empty */
+		reflect.ValueOf((*bool)(nil)):                             true,
+		reflect.ValueOf(func() *bool { b := false; return &b }()): false,
+	}
+
+	for k, v := range elements {
+		if emptyMessageElement(k) != v {
+			s := "empty"
+			if v {
+				s = "non-empty"
+			}
+
+			t.Errorf("emptyMessageElement reports %v (%s) is %s", k.Interface(), k.Kind(), s)
+		}
+	}
+}
