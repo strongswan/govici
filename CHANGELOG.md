@@ -3,6 +3,11 @@ All notable changes to govici will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+- New `inline` tag option for inlining embedded structs.
+
 ## [v0.4.1] - 2020-08-10
 
 ### Changed
