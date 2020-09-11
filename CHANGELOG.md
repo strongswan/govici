@@ -3,10 +3,12 @@ All notable changes to govici will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [v0.5.0] - 2020-09-14
 
 ### Added
 - New `inline` tag option for inlining embedded structs.
+- Explicitly define "empty" message element so that it is clear when a field
+  will not be marshaled into a Message.
 
 ## [v0.4.1] - 2020-08-10
 
@@ -33,6 +35,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Removed
 - Session.Listen API.
 
-[Unreleased]: https://github.com/strongswan/govici/compare/v0.4.1...HEAD
+[Unreleased]: https://github.com/strongswan/govici/compare/v0.5.0...HEAD
 [v0.4.0]: https://github.com/strongswan/govici/compare/v0.3.0...v0.4.0
 [v0.4.1]: https://github.com/strongswan/govici/compare/v0.4.0...v0.4.1
+[v0.5.0]: https://github.com/strongswan/govici/compare/v0.4.1...v0.5.0
