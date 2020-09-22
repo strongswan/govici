@@ -81,18 +81,25 @@ func newPacket(ptype uint8, name string, msg *Message) *packet {
 
 // isNamed returns a bool indicating the packet is a named type
 func (p *packet) isNamed() bool {
-	n := map[uint8]bool{
-		pktCmdRequest:      true,
-		pktCmdResponse:     false,
-		pktCmdUnkown:       false,
-		pktEventRegister:   true,
-		pktEventUnregister: true,
-		pktEventConfirm:    false,
-		pktEventUnknown:    false,
-		pktEvent:           true,
+	switch p.ptype {
+	case /* Named packet types */
+		pktCmdRequest,
+		pktEventRegister,
+		pktEventUnregister,
+		pktEvent:
+
+		return true
+
+	case /* Un-named packet types */
+		pktCmdResponse,
+		pktCmdUnkown,
+		pktEventConfirm,
+		pktEventUnknown:
+
+		return false
 	}
 
-	return n[p.ptype]
+	return false
 }
 
 // bytes formats the packet and returns it as a byte slice
