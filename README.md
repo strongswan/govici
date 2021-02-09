@@ -1,7 +1,7 @@
 # govici
 
 [![Build Status](https://travis-ci.org/strongswan/govici.svg?branch=master)](https://travis-ci.org/strongswan/govici)
-[![GoDoc](https://godoc.org/github.com/strongswan/govici/vici?status.svg)](https://godoc.org/github.com/strongswan/govici/vici)
+[![Go Reference](https://pkg.go.dev/badge/github.com/strongswan/govici/vici.svg)](https://pkg.go.dev/github.com/strongswan/govici/vici)
 [![Go Report Card](https://goreportcard.com/badge/github.com/strongswan/govici/vici)](https://goreportcard.com/report/github.com/strongswan/govici/vici)
 
 ## About
