@@ -189,7 +189,13 @@ func main() {
                 // field contains the Message from the server.
                 switch e.Name{
                 case "ike-updown":
-		        state := e.Message.Get(name).(*vici.Message).Get("state")
+                        m, ok := e.Message.Get(name).(*vici.Message)
+                        if !ok {
+                                fmt.Printf("Expected *Message in field 'name', but got %T", m)
+                                continue
+                        }
+
+                        state := m.Get("state")
 		        fmt.Printf("IKE SA state changed (name=%s): %s\n", name, state)
                 case "log":
                         // Log events contain a 'msg' field with the log message
