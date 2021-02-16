@@ -264,25 +264,20 @@ type messageElement struct {
 	v interface{}
 }
 
-func (m *Message) elements() chan messageElement {
-	c := make(chan messageElement)
-	go m.orderedIterate(c)
+func (m *Message) elements() []messageElement {
+	ordered := make([]messageElement, len(m.keys))
 
-	return c
-}
-
-func (m *Message) orderedIterate(c chan messageElement) {
-	defer close(c)
-
-	for _, k := range m.keys {
-		c <- messageElement{k, m.data[k]}
+	for i, k := range m.keys {
+		ordered[i] = messageElement{k: k, v: m.data[k]}
 	}
+
+	return ordered
 }
 
 func (m *Message) encode() ([]byte, error) {
 	buf := bytes.NewBuffer([]byte{})
 
-	for e := range m.elements() {
+	for _, e := range m.elements() {
 		k := e.k
 		v := e.v
 
@@ -489,7 +484,7 @@ func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
 	}
 
 	// Encode the sections elements
-	for e := range section.elements() {
+	for _, e := range section.elements() {
 		k := e.k
 		v := e.v
 
@@ -992,7 +987,7 @@ func (m *Message) unmarshalToMap(rv reflect.Value) error {
 		return fmt.Errorf("%v: map keys of type %v are not compatible with string", errUnmarshalTypeMismatch, rv.Type().Key().Kind())
 	}
 
-	for e := range m.elements() {
+	for _, e := range m.elements() {
 		key := reflect.ValueOf(e.k)
 		val := reflect.ValueOf(e.v)
 
