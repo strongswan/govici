@@ -198,16 +198,19 @@ func (el *eventListener) listen() {
 }
 
 func (el *eventListener) nextEvent(ctx context.Context) (Event, error) {
-	var e Event
+	var (
+		e  Event
+		ok bool
+	)
 
 	select {
 	case <-ctx.Done():
 		return Event{}, ctx.Err()
-	case e = <-el.ec:
+	case e, ok = <-el.ec:
 		// Event received, carry on.
 	}
 
-	if e.Message == nil && e.err == nil {
+	if !ok {
 		return Event{}, errChannelClosed
 	}
 
