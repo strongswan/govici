@@ -34,8 +34,8 @@ var (
 )
 
 func (s *Session) sendRequest(cmd string, msg *Message) (*Message, error) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	p, err := s.cmdTransportCommunicate(newPacket(pktCmdRequest, cmd, msg))
 	if err != nil {
@@ -50,8 +50,8 @@ func (s *Session) sendRequest(cmd string, msg *Message) (*Message, error) {
 }
 
 func (s *Session) sendStreamedRequest(cmd string, event string, msg *Message) (*MessageStream, error) {
-	s.mux.Lock()
-	defer s.mux.Unlock()
+	s.mu.Lock()
+	defer s.mu.Unlock()
 
 	err := s.streamEventRegisterUnregister(event, true)
 	if err != nil {

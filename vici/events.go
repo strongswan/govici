@@ -48,7 +48,7 @@ type eventListener struct {
 
 	// The listen goroutune reads events, and the
 	// register/unregisterEvent functions write to events.
-	emux   sync.Mutex
+	mu     sync.Mutex
 	events []string
 
 	// Packet channel used to communicate event registration
@@ -157,11 +157,11 @@ func (el *eventListener) listen() {
 			// If there are no events currently registered, there is no
 			// point in sending errors on the event channel. The error
 			// must be for a event registration.
-			el.emux.Lock()
+			el.mu.Lock()
 			if len(el.events) > 0 {
 				el.ec <- Event{err: err}
 			}
-			el.emux.Unlock()
+			el.mu.Unlock()
 
 			// If we got EOF, then the event listener transport
 			// has been closed (by a stopped daemon or otherwise),
@@ -218,8 +218,8 @@ func (el *eventListener) nextEvent(ctx context.Context) (Event, error) {
 }
 
 func (el *eventListener) registerEvents(events []string) error {
-	el.emux.Lock()
-	defer el.emux.Unlock()
+	el.mu.Lock()
+	defer el.mu.Unlock()
 
 	for _, event := range events {
 		// Check if the event is already registered.
@@ -251,8 +251,8 @@ func (el *eventListener) registerEvents(events []string) error {
 }
 
 func (el *eventListener) unregisterEvents(events []string, all bool) error {
-	el.emux.Lock()
-	defer el.emux.Unlock()
+	el.mu.Lock()
+	defer el.mu.Unlock()
 
 	if all {
 		events = el.events

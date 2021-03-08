@@ -41,7 +41,7 @@ type Session struct {
 	// transports: one is locked with mutex during use, e.g. command
 	// requests (including streamed requests), and the other is used
 	// for listening to registered events.
-	mux sync.Mutex
+	mu  sync.Mutex
 	ctr *transport
 
 	el *eventListener
@@ -109,7 +109,7 @@ func (s *Session) Close() error {
 		return err
 	}
 
-	s.mux.Lock()
+	s.mu.Lock()
 	if s.ctr != nil {
 		if err := s.ctr.conn.Close(); err != nil {
 			return err
@@ -117,7 +117,7 @@ func (s *Session) Close() error {
 
 		s.ctr = nil
 	}
-	s.mux.Unlock()
+	s.mu.Unlock()
 
 	return nil
 }
