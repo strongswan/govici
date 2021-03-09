@@ -13,7 +13,7 @@ jobs:
       with:
         go-version: ${{ matrix.go-version }}
     - name: Install strongswan
-      run: sudo apt install strongswan-charon strongswan-swanctl -y
+      run: sudo apt install strongswan-charon strongswan-swanctl charon-systemd -y
     - name: Start strongswan
       run: sudo systemctl start strongswan
     - name: Checkout code
