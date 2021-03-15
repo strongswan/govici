@@ -46,8 +46,7 @@ type eventListener struct {
 	// Event channel and the events it's listening for.
 	ec chan Event
 
-	// The listen goroutune reads events, and the
-	// register/unregisterEvent functions write to events.
+	// Lock events when registering and unregistering.
 	mu     sync.Mutex
 	events []string
 
@@ -71,8 +70,6 @@ type Event struct {
 	// Timestamp holds the timestamp of when the client
 	// received the event.
 	Timestamp time.Time
-
-	err error
 }
 
 func newEventListener(t *transport) *eventListener {
@@ -147,22 +144,6 @@ func (el *eventListener) listen() {
 			}
 			el.perr <- err
 
-			// It is worth pointing out that the order of sending packet errors
-			// versus sending errors over the event channel is significant. While
-			// deadlock will _not_ occur due to the timeout in eventTransportCommunicate,
-			// the _wrong_ error would be returned by the aforementioned function. If these
-			// blocks were reverse, the code execution would continue on, but the emux would
-			// be free _only_ because of the time.After in eventTransportCommunicate.
-			//
-			// If there are no events currently registered, there is no
-			// point in sending errors on the event channel. The error
-			// must be for a event registration.
-			el.mu.Lock()
-			if len(el.events) > 0 {
-				el.ec <- Event{err: err}
-			}
-			el.mu.Unlock()
-
 			// If we got EOF, then the event listener transport
 			// has been closed (by a stopped daemon or otherwise),
 			// and all subsequent calls to recv() will result in
@@ -198,23 +179,17 @@ func (el *eventListener) listen() {
 }
 
 func (el *eventListener) nextEvent(ctx context.Context) (Event, error) {
-	var (
-		e  Event
-		ok bool
-	)
-
 	select {
 	case <-ctx.Done():
 		return Event{}, ctx.Err()
-	case e, ok = <-el.ec:
-		// Event received, carry on.
-	}
 
-	if !ok {
-		return Event{}, errChannelClosed
-	}
+	case e, ok := <-el.ec:
+		if !ok {
+			return Event{}, errChannelClosed
+		}
 
-	return e, e.err
+		return e, nil
+	}
 }
 
 func (el *eventListener) registerEvents(events []string) error {
