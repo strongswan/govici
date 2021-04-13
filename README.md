@@ -1,6 +1,7 @@
 # govici
 
-[![Build Status](https://travis-ci.org/strongswan/govici.svg?branch=master)](https://travis-ci.org/strongswan/govici)
+[![Lint](https://github.com/strongswan/govici/actions/workflows/lint.yaml/badge.svg)](https://github.com/strongswan/govici/actions/workflows/lint.yaml?query=branch%3Amaster)
+[![Tests](https://github.com/strongswan/govici/actions/workflows/test.yaml/badge.svg)](https://github.com/strongswan/govici/actions/workflows/test.yaml?query=branch%3Amaster)
 [![Go Reference](https://pkg.go.dev/badge/github.com/strongswan/govici/vici.svg)](https://pkg.go.dev/github.com/strongswan/govici/vici)
 [![Go Report Card](https://goreportcard.com/badge/github.com/strongswan/govici/vici)](https://goreportcard.com/report/github.com/strongswan/govici/vici)
 
