@@ -18,7 +18,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ## [v0.4.0] - 2020-07-03
 
 ### Added
-- CHANGELOG.md particularly to help track API changes pre-v0.1.0.
+- CHANGELOG.md particularly to help track API changes pre-v1.0.0.
 - Session.Subscribe/Unsubscribe/UnsubscribeAll APIs for event subscription.
 - WithAddr SessionOption to specify address that charon is listening on.
 - WithDialContext SessionOption to provide a dial func to Session.
