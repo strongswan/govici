@@ -3,7 +3,7 @@ All notable changes to govici will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-## [Unreleased]
+## [v0.5.1] - 2021-04-12
 
 ### Added
 - GitHub workflows.
@@ -44,7 +44,8 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Removed
 - Session.Listen API.
 
-[Unreleased]: https://github.com/strongswan/govici/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/strongswan/govici/compare/v0.5.1...HEAD
 [v0.4.0]: https://github.com/strongswan/govici/compare/v0.3.0...v0.4.0
 [v0.4.1]: https://github.com/strongswan/govici/compare/v0.4.0...v0.4.1
 [v0.5.0]: https://github.com/strongswan/govici/compare/v0.4.1...v0.5.0
+[v0.5.1]: https://github.com/strongswan/govici/compare/v0.5.0...v0.5.1
