@@ -3,6 +3,15 @@ All notable changes to govici will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+- GitHub workflows.
+
+### Changed
+- Event listener does not send unnecessary errors to event channel.
+- Simplified some internal functions, like packet.isNamed() and Message.elements().
+
 ## [v0.5.0] - 2020-09-14
 
 ### Added
