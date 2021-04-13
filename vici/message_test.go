@@ -490,6 +490,94 @@ func TestMessageGetRecursive(t *testing.T) {
 	}
 }
 
+func TestMessageGetString(t *testing.T) {
+	m := &Message{
+		keys: []string{"key1", "key2", "key3"},
+		data: map[string]interface{}{
+			"key1": "value1",
+			"key2": new(Message),
+			"key3": make([]string, 0),
+		},
+	}
+
+	s, ok := m.GetString("key1")
+	if !ok || s != "value1" {
+		t.Fatalf("expected (s='value1',ok=true), got (s='%v',ok=false)", s)
+	}
+
+	s, ok = m.GetString("key2")
+	if ok || s != "" {
+		t.Fatalf("expected (s='',ok=false), got (s=%v,ok=%v)", s, ok)
+	}
+
+	s, ok = m.GetString("key3")
+	if ok || s != "" {
+		t.Fatalf("expected (s='',ok=false), got (s=%v,ok=%v)", s, ok)
+	}
+}
+
+func TestMessageGetList(t *testing.T) {
+	m := &Message{
+		keys: []string{"key1", "key2", "key3"},
+		data: map[string]interface{}{
+			"key1": []string{"item1", "item2"},
+			"key2": new(Message),
+			"key3": "",
+		},
+	}
+
+	l, ok := m.GetList("key1")
+	if !ok || !reflect.DeepEqual(l, []string{"item1", "item2"}) {
+		t.Fatalf("expected (l=[item1, item2],ok=true), got (l=%v,ok=%v)", l, ok)
+	}
+
+	l, ok = m.GetList("key2")
+	if ok || l != nil {
+		t.Fatalf("expected (l=nil,ok=false), got (l=%v,ok=%v)", l, ok)
+	}
+
+	l, ok = m.GetList("key3")
+	if ok || l != nil {
+		t.Fatalf("expected (l=nil,ok=false), got (l=%v,ok=%v)", l, ok)
+	}
+}
+
+func TestMessageGetSection(t *testing.T) {
+	m := &Message{
+		keys: []string{"key1", "key2", "key3"},
+		data: map[string]interface{}{
+			"key1": &Message{
+				keys: []string{"sub-key1"},
+				data: map[string]interface{}{
+					"sub-key1": "sub-value1",
+				},
+			},
+			"key2": make([]string, 0),
+			"key3": "",
+		},
+	}
+
+	want := NewMessage()
+	if err := want.Set("sub-key1", "sub-value1"); err != nil {
+		t.Fatal(err)
+	}
+
+	v, ok := m.GetSection("key1")
+	if !ok || !reflect.DeepEqual(v, want) {
+		t.Fatalf("expected (v=%v,ok=true), got (v='%v',ok=%v)", want, v, ok)
+	}
+
+	v, ok = m.GetSection("key2")
+	if ok || v != nil {
+		t.Fatalf("expected (v=nil,ok=false), got (v=%v,ok=%v)", v, ok)
+	}
+
+	v, ok = m.GetSection("key3")
+	if ok || v != nil {
+		t.Fatalf("expected (v=nil,ok=false), got (v=%v,ok=%v)", v, ok)
+	}
+}
+
 func TestMessageGetRecursiveInvalid(t *testing.T) {
 	v := goldMessage.Get("section1", "sub-section", "key2", "invalid")
 	if v != nil {
