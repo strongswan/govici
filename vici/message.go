@@ -201,18 +201,36 @@ func (m *Message) Unset(key string) {
 	}
 }
 
-// Get returns the value of the field identified by key, if it exists. If
-// the field does not exist, nil is returned.
+// Get returns the value of the field identified by the last key in keys, if it
+// exists. If the field does not exist, nil is returned. It is expected that
+// each intermediate key will return a sub-section (*Message). Else, nil is
+// returned.
 //
 // The value returned by Get is the internal message representation of that
 // field, which means the type is either string, []string, or *Message.
-func (m *Message) Get(key string) interface{} {
-	v, ok := m.data[key]
-	if !ok {
-		return nil
+func (m *Message) Get(keys ...string) interface{} {
+	tmp := new(Message)
+	*tmp = *m
+
+	for i, k := range keys {
+		v, ok := tmp.data[k]
+		if !ok {
+			return nil
+		}
+
+		// If this is the last key, return whatever is in data[k].
+		// Otherwise, reset tmp and continue the loop.
+		if i == len(keys)-1 {
+			return v
+		}
+
+		tmp, ok = v.(*Message)
+		if !ok {
+			return nil
+		}
 	}
 
-	return v
+	return nil
 }
 
 // Keys returns the list of valid message keys.
