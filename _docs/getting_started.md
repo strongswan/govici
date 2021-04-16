@@ -32,34 +32,35 @@ Say we wanted to get the version information of the charon daemon running on our
 
 This means that the command does not accept any arguments, and returns five key-value pairs. So, there is no need to construct a request message for this command. Now all we have to do is make a command request using the `Session.CommandRequest` function.
 
+[embedmd]:# (code/getting_started_command_request.go)
 ```go
 package main
 
 import (
-        "fmt"
+	"fmt"
 
-        "github.com/strongswan/govici/vici"
+	"github.com/strongswan/govici/vici"
 )
 
 func main() {
-        session, err := vici.NewSession()
-        if err != nil {
-                fmt.Println(err)
-                return
-        }
-        defer session.Close()
+	session, err := vici.NewSession()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer session.Close()
 
-        m, err := session.CommandRequest("version", nil)
-        if err != nil {
-                fmt.Println(err)
-                return
-        }
+	m, err := session.CommandRequest("version", nil)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
 
-        for _, k := range m.Keys() {
-                fmt.Printf("%v: %v\n", k, m.Get(k))
-        }
+	for _, k := range m.Keys() {
+		fmt.Printf("%v: %v\n", k, m.Get(k))
+	}
 }
-``` 
+```
 
 On my machine, this gives me:
 
@@ -104,52 +105,54 @@ Where each `list-cert` event contains the following information:
 
 So, let's say we wanted to filter the results to only list CA certs. We can accomplish this by doing the following:
 
+[embedmd]:# (code/getting_started_list_certs.go)
 ```go
 package main
 
 import (
-        "fmt"
+	"fmt"
 
-        "github.com/strongswan/govici/vici"
+	"github.com/strongswan/govici/vici"
 )
 
 func main() {
-        session, err := vici.NewSession()
-        if err != nil {
-                fmt.Println(err)
-                return
-        }
-        defer session.Close()
+	session, err := vici.NewSession()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	defer session.Close()
 
-        m := vici.NewMessage()
-        
-        if err := m.Set("flag", "CA"); err != nil {
-                fmt.Println(err)
-                return
-        }
+	m := vici.NewMessage()
 
-        ms, err := session.StreamedCommandRequest("list-certs", "list-cert", m)
-        if err != nil {
-                fmt.Println(err)
-                return
-        }
+	if err := m.Set("flag", "CA"); err != nil {
+		fmt.Println(err)
+		return
+	}
 
-        for _, m := range ms.Messages() {
-                if m.Err() != nil {
-                        fmt.Println(err)
-                        return
-                }
-                
-                // Process CA cert information
-                // ...        
-        }
+	ms, err := session.StreamedCommandRequest("list-certs", "list-cert", m)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	for _, m := range ms.Messages() {
+		if m.Err() != nil {
+			fmt.Println(err)
+			return
+		}
+
+		// Process CA cert information
+		// ...
+	}
 }
-``` 
+```
 
 ## Event Listener
 
 A `Session` can also be used to listen for specific server-issued events at any time, not only during streamed command requests. This is done with the `Session.Subscribe` function, which accepts a list of event types. As an example, say we wanted to create a routine to monitor the state of a given SA, as well as `log` events. We can register the `Session`'s event listener to listen for the `ike-updown` and `log` events like this:
 
+[embedmd]:# (code/getting_started_events.go)
 ```go
 package main
 
@@ -184,23 +187,23 @@ func main() {
 			return
 		}
 
-                // The Event.Name field corresponds to the event name
-                // we used to make the subscription. The Event.Message
-                // field contains the Message from the server.
-                switch e.Name{
-                case "ike-updown":
-                        m, ok := e.Message.Get(name).(*vici.Message)
-                        if !ok {
-                                fmt.Printf("Expected *Message in field 'name', but got %T", m)
-                                continue
-                        }
+		// The Event.Name field corresponds to the event name
+		// we used to make the subscription. The Event.Message
+		// field contains the Message from the server.
+		switch e.Name {
+		case "ike-updown":
+			m, ok := e.Message.Get(name).(*vici.Message)
+			if !ok {
+				fmt.Printf("Expected *Message in field 'name', but got %T", m)
+				continue
+			}
 
-                        state := m.Get("state")
-		        fmt.Printf("IKE SA state changed (name=%s): %s\n", name, state)
-                case "log":
-                        // Log events contain a 'msg' field with the log message
-                        fmt.Println(e.Message.Get("msg"))
-                }
+			state := m.Get("state")
+			fmt.Printf("IKE SA state changed (name=%s): %s\n", name, state)
+		case "log":
+			// Log events contain a 'msg' field with the log message
+			fmt.Println(e.Message.Get("msg"))
+		}
 	}
 }
 ```
@@ -224,21 +227,24 @@ Some commands require a lot of parameters, or even a whole IKE SA configuration 
 
 So our Go struct is simple:
 
+[embedmd]:# (code/getting_started_load_cert.go /type cert/ /}/)
 ```go
 type cert struct {
-        Type string `vici:"type"`
-        Flag string `vici:"flag"`
-        Data string `vici:"data"`
+	Type string `vici:"type"`
+	Flag string `vici:"flag"`
+	Data string `vici:"data"`
 }
 ```
 
 Remember, as stated on [godoc](https://godoc.org/github.com/strongswan/govici/vici#MarshalMessage), struct fields are only marshaled when they are exported and have a `vici` struct tag. Notice that the struct tags are identical to the field names in the `load-cert` message parameters. Now, we could wrap this all up into a helper function that loads a certificate into the daemon given its path on the filesystem.
 
+[embedmd]:# (code/getting_started_load_cert.go)
 ```go
 package main
 
 import (
 	"encoding/pem"
+	"fmt"
 	"io/ioutil"
 
 	"github.com/strongswan/govici/vici"
@@ -285,6 +291,12 @@ func loadX509Cert(path string, cacert bool) error {
 
 	return err
 }
+
+func main() {
+	if err := loadX509Cert("/path/to/cert", false); err != nil {
+		fmt.Println(err)
+	}
+}
 ```
 
 Pointer types can be useful to preserve defaults as specified in [swanctl.conf](https://wiki.strongswan.org/projects/strongswan/wiki/Swanctlconf) when those defaults do not align with Go zero values. For example, mobike is [enabled by default for IKEv2 connections](https://wiki.strongswan.org/projects/strongswan/wiki/Swanctlconf#connections-section), but if you have a `Mobike bool` field in your struct, the Go zero value will override the default behavior. In these situations, using `*bool` will result in the zero-value being `nil`, and the field will not be marshaled.
@@ -325,6 +337,7 @@ We'll create Go types that satisfy the needs of this specific configuration, a c
 
 We can start by defining a type for a connection, where the fields correspond to the [`connections.<conn>.*`](https://wiki.strongswan.org/projects/strongswan/wiki/Swanctlconf#connections-section) fields defined in the `swanctl.conf` documentation.
 
+[embedmd]:# (code/getting_started_initiate.go /type connection/ /}/) 
 ```go
 type connection struct {
 	Name string // This field will NOT be marshaled!
@@ -340,13 +353,16 @@ type connection struct {
 
 Then, we need to define `localOpts` and `remoteOpts` as referenced in the above definition:
 
+[embedmd]:# (code/getting_started_initiate.go /type localOpts/ /}/) 
 ```go
 type localOpts struct {
 	Auth  string   `vici:"auth"`
 	Certs []string `vici:"certs"`
 	ID    string   `vici:"id"`
 }
-
+```
+[embedmd]:# (code/getting_started_initiate.go /type remoteOpts/ /}/) 
+```go
 type remoteOpts struct {
 	Auth string `vici:"auth"`
 }
@@ -356,6 +372,7 @@ Remember, in this example, we only include the fields that are needed for our pa
 
 Finally, we need a `childSA` type:
 
+[embedmd]:# (code/getting_started_initiate.go /type childSA/ /}/) 
 ```go
 type childSA struct {
 	LocalTrafficSelectors []string `vici:"local_ts"`
@@ -366,11 +383,14 @@ type childSA struct {
 
 Putting this all together, we can write some helpers to load our configuration into the daemon, and then establish the SAs.
 
+[embedmd]:# (code/getting_started_initiate.go)
 ```go
 package main
 
 import (
-        "github.com/strongswan/govici/vici"
+	"fmt"
+
+	"github.com/strongswan/govici/vici"
 )
 
 type connection struct {
@@ -405,17 +425,17 @@ func loadConn(conn connection) error {
 	if err != nil {
 		return err
 	}
-        defer s.Close()
+	defer s.Close()
 
 	c, err := vici.MarshalMessage(&conn)
 	if err != nil {
 		return err
 	}
 
-        m := vici.NewMessage()
-        if err := m.Set(conn.Name, c); err != nil {
-                return err
-        }
+	m := vici.NewMessage()
+	if err := m.Set(conn.Name, c); err != nil {
+		return err
+	}
 
 	_, err = s.CommandRequest("load-conn", m)
 
@@ -427,7 +447,7 @@ func initiate(ike, child string) error {
 	if err != nil {
 		return err
 	}
-        defer s.Close()
+	defer s.Close()
 
 	m := vici.NewMessage()
 
@@ -446,10 +466,16 @@ func initiate(ike, child string) error {
 
 	for _, msg := range ms.Messages() {
 		if err := msg.Err(); err != nil {
-                        return err
+			return err
 		}
 	}
 
 	return nil
+}
+
+func main() {
+	if err := initiate("ike", "child"); err != nil {
+		fmt.Println(err)
+	}
 }
 ```

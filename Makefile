@@ -13,3 +13,13 @@ test:
 .PHONY: golint
 golint:
 	golangci-lint --verbose run
+
+.PHONY: docs
+docs: docs-code-examples
+	embedmd -w _docs/*.md
+
+.PHONY: docs-code-examples
+docs-code-examples: _docs/code/*.go
+	for file in $^ ; do \
+	    go build -o /dev/null $${file} ; \
+	done
