@@ -79,7 +79,7 @@ func (t *transport) send(pkt *packet) error {
 func (t *transport) recv() (*packet, error) {
 	buf := make([]byte, headerLength)
 
-	_, err := t.conn.Read(buf)
+	_, err := io.ReadFull(t.conn, buf)
 	if err != nil {
 		if err == io.EOF {
 			return nil, err
@@ -94,7 +94,7 @@ func (t *transport) recv() (*packet, error) {
 	pl := binary.BigEndian.Uint32(buf)
 
 	buf = make([]byte, int(pl))
-	_, err = t.conn.Read(buf)
+	_, err = io.ReadFull(t.conn, buf)
 	if err != nil {
 		if err == io.EOF {
 			return nil, err
