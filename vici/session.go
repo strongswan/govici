@@ -28,7 +28,6 @@ package vici
 
 import (
 	"context"
-	"fmt"
 	"net"
 	"sync"
 )
@@ -93,7 +92,7 @@ func (s *Session) newTransport() (*transport, error) {
 
 	conn, err := s.dialer(context.Background(), s.network, s.addr)
 	if err != nil {
-		return nil, fmt.Errorf("%v: %v", errTransport, err)
+		return nil, err
 	}
 
 	t := &transport{
