@@ -178,8 +178,7 @@ func maybeSkipIntegrationTest(t *testing.T) {
 }
 
 // TestCommandRequest tests CommandRequest by calling the 'version' command.
-// For good measure, check the response and make sure the 'daemon' field is
-// set to 'charon.'
+// Make sure that 'daemon' is a non-empty string.
 func TestCommandRequest(t *testing.T) {
 	maybeSkipIntegrationTest(t)
 
@@ -194,8 +193,8 @@ func TestCommandRequest(t *testing.T) {
 		t.Fatalf("Failed to get charon version information: %v", err)
 	}
 
-	if d := resp.Get("daemon"); d != "charon" {
-		t.Fatalf("Got unexpected value for 'daemon' (%s)", d)
+	if d := resp.Get("daemon"); d == "" {
+		t.Fatal("Expected non-empty value at key 'daemon'")
 	}
 }
 
