@@ -158,38 +158,6 @@ func TestIdempotentSessionClose(t *testing.T) {
 	}
 }
 
-// TestNextEventAfterFailedSubscribe makes sure that a packet read
-// error that occurred while no events are registered, e.g. during
-// the first call to subscribe, are not propagated to subsequent
-// calls to NextEvent.
-func TestNextEventAfterFailedSubscribe(t *testing.T) {
-	dctx, dcancel := context.WithCancel(context.Background())
-	defer dcancel()
-
-	conn := mockCharon(dctx)
-
-	s, err := NewSession(withTestConn(conn))
-	if err != nil {
-		t.Fatalf("Failed to create session: %v", err)
-	}
-	defer s.Close()
-
-	// This should result in an IO error, and if handled properly within
-	// the event listener, the error should not be sent on the event channel.
-	s.el.conn.Close()
-	if err := s.Subscribe("test-event"); err == nil {
-		t.Fatalf("Expected error reading from closed transport")
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-
-	_, err = s.NextEvent(ctx)
-	if err != ctx.Err() {
-		t.Fatalf("Expected to get timeout error, got: %v", err)
-	}
-}
-
 // These tests are considered 'integration' tests because they require charon
 // to be running, and make actual client-issued commands. Note that these are
 // only meant to test the package API, and the specific commands used are out
