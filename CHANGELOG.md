@@ -3,6 +3,12 @@ All notable changes to govici will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Changed
+- Fixed https://github.com/strongswan/govici/issues/34.
+- Simplified event error handling code, and event listener control flow.
+
 ## [v0.5.1] - 2021-04-12
 
 ### Added
