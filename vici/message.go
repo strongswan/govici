@@ -91,6 +91,10 @@ type MessageStream struct {
 	messages []*Message
 }
 
+func NewMessageStream(messages ...*Message) *MessageStream {
+	return &MessageStream{messages: messages}
+}
+
 // Messages returns the messages received from the streamed request.
 func (ms *MessageStream) Messages() []*Message {
 	return ms.messages

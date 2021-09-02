@@ -93,7 +93,7 @@ func (s *Session) handleStreamedRequest(cmd, event string, msg *Message) (*Messa
 	}
 	messages = append(messages, p.msg)
 
-	return &MessageStream{messages}, nil
+	return NewMessageStream(messages...), nil
 }
 
 // streamEventRegisterUnregister will (un)register the given event type, based on the register boolean.
