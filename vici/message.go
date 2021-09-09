@@ -833,7 +833,7 @@ func (m *Message) marshalFromStruct(rv reflect.Value) error {
 
 		if mt.inline {
 			if rfv.Kind() != reflect.Struct {
-				return fmt.Errorf("%v: cannot marshal non-struct inlined field %v", errMarshalUnsupportedType, rv.Kind())
+				return fmt.Errorf("%v: cannot marshal non-struct inlined field %v", errMarshalUnsupportedType, rfv.Kind())
 			}
 
 			err := m.marshalFromStruct(rfv)
@@ -958,7 +958,7 @@ func (m *Message) unmarshalToStruct(rv reflect.Value) error {
 
 		if tag.inline {
 			if rfv.Kind() != reflect.Struct {
-				return fmt.Errorf("%v: cannot unmarshal into non-struct inlined field %v", errUnmarshalUnsupportedType, rv.Kind())
+				return fmt.Errorf("%v: cannot unmarshal into non-struct inlined field %v", errUnmarshalUnsupportedType, rfv.Kind())
 			}
 
 			err := m.unmarshalToStruct(rfv)
