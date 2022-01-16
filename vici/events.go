@@ -119,8 +119,20 @@ func (el *eventListener) listen() {
 				Timestamp: ts,
 			}
 
-			el.ec <- e
 			el.dispatch(e)
+
+			// Make sure that listen() cannot get stuck when
+			// the event buffer is full. To ensure the events
+			// in the buffer are not too "stale", discard the
+			// oldest event rather than discarding this new event.
+			select {
+			case el.ec <- e:
+			default:
+				select {
+				case <-el.ec:
+				default:
+				}
+			}
 
 		// These SHOULD be in response to event registration
 		// requests from the event listener. Forward them over

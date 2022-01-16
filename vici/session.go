@@ -231,6 +231,10 @@ func (s *Session) UnsubscribeAll() error {
 
 // NextEvent returns the next event received by the session event listener.  NextEvent will block
 // until an Event (or error) is received, or until the supplied context is closed.
+//
+// When the internal Event buffer is full, for example if NextEvent is not called frequently enough
+// to keep up with the event rate, the oldest Event is discarded from the buffer to make room for the
+// new Event.
 func (s *Session) NextEvent(ctx context.Context) (Event, error) {
 	return s.el.nextEvent(ctx)
 }
