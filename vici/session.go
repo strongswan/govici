@@ -210,7 +210,7 @@ func (s *Session) StreamedCommandRequest(cmd string, event string, msg *Message)
 }
 
 // Subscribe registers the session to listen for all events given. To receive
-// events that are registered here, use NextEvent. An error is returned if
+// events that are registered here, use NotifyEvents. An error is returned if
 // Subscribe is not able to register the given events with the charon daemon.
 func (s *Session) Subscribe(events ...string) error {
 	return s.el.registerEvents(events)
