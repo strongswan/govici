@@ -86,6 +86,9 @@ var (
 
 // MessageStream is used to feed continuous data during a command request, and simply
 // contains a slice of *Message.
+//
+// Deprecated: MessageStream will be removed prior to v1.0 in favor of using
+// the type []*Message instead.
 type MessageStream struct {
 	// Message list
 	messages []*Message
