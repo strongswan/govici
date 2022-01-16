@@ -47,6 +47,9 @@ type eventListener struct {
 	// Packet channel used to communicate event registration
 	// results.
 	pc chan *packet
+
+	muChans sync.Mutex
+	chans   map[chan<- Event]struct{}
 }
 
 // Event represents an event received by a Session sent from the
@@ -70,6 +73,7 @@ func newEventListener(t *transport) *eventListener {
 		transport: t,
 		ec:        make(chan Event, 16),
 		pc:        make(chan *packet, 4),
+		chans:     make(map[chan<- Event]struct{}),
 	}
 
 	go el.listen()
@@ -116,12 +120,39 @@ func (el *eventListener) listen() {
 			}
 
 			el.ec <- e
+			el.dispatch(e)
 
 		// These SHOULD be in response to event registration
 		// requests from the event listener. Forward them over
 		// the packet channel.
 		case pktEventConfirm, pktEventUnknown:
 			el.pc <- p
+		}
+	}
+}
+
+func (el *eventListener) notify(c chan<- Event) {
+	el.muChans.Lock()
+	defer el.muChans.Unlock()
+
+	el.chans[c] = struct{}{}
+}
+
+func (el *eventListener) stop(c chan<- Event) {
+	el.muChans.Lock()
+	defer el.muChans.Unlock()
+
+	delete(el.chans, c)
+}
+
+func (el *eventListener) dispatch(e Event) {
+	el.muChans.Lock()
+	defer el.muChans.Unlock()
+
+	for c := range el.chans {
+		select {
+		case c <- e:
+		default:
 		}
 	}
 }

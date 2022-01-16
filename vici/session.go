@@ -234,3 +234,22 @@ func (s *Session) UnsubscribeAll() error {
 func (s *Session) NextEvent(ctx context.Context) (Event, error) {
 	return s.el.nextEvent(ctx)
 }
+
+// NotifyEvents registers c for writing received events. The Session must first
+// subscribe to events using the Subscribe method.
+//
+// Writes to c will not block: the caller must ensure that c has sufficient
+// buffer space to keep up with the expected event rate. If the write to c
+// would block, the event is discarded.
+//
+// NotifyEvents may be called multiple times with different channels: each
+// channel will indepedently receive a copy of each event received by the
+// Session.
+func (s *Session) NotifyEvents(c chan<- Event) {
+	s.el.notify(c)
+}
+
+// StopEvents stops writing received events to c.
+func (s *Session) StopEvents(c chan<- Event) {
+	s.el.stop(c)
+}
