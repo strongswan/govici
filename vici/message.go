@@ -91,6 +91,7 @@ type MessageStream struct {
 	messages []*Message
 }
 
+// NewMessageStream returns a new MessageStream.
 func NewMessageStream(messages ...*Message) *MessageStream {
 	return &MessageStream{messages: messages}
 }
