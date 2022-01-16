@@ -76,6 +76,8 @@ func newEventListener(t *transport) *eventListener {
 		chans:     make(map[chan<- Event]struct{}),
 	}
 
+	el.notify(el.ec)
+
 	go el.listen()
 
 	return el
@@ -102,6 +104,7 @@ func (el *eventListener) listen() {
 	// ensures any active NextEvent callers return.
 	defer close(el.ec)
 	defer close(el.pc)
+	defer el.stop(el.ec)
 
 	for {
 		p, err := el.recv()
@@ -119,7 +122,6 @@ func (el *eventListener) listen() {
 				Timestamp: ts,
 			}
 
-			el.ec <- e
 			el.dispatch(e)
 
 		// These SHOULD be in response to event registration
