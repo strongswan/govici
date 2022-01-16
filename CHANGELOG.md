@@ -3,6 +3,20 @@ All notable changes to govici will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Added
+- Session.NotifyEvents API.
+- Session.StopEvents API.
+- NewMessageStream function.
+- More package-level documentation for pkg.go.dev page.
+
+### Changed
+- NextEvent will not block if it receives an event and the event channel buffer is full.
+- NextEvent is deprecated in favor of NotifyEvents, and will be removed prior to v1.0.
+- MessageStream type is deprecated, and will be removed prior to v1.0.
+- Fix an error message related to trying to unmarshal into the wrong type.
+
 ## [v0.5.2] - 2021-08-24
 
 ### Changed
