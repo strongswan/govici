@@ -154,7 +154,6 @@ A `Session` can also be used to listen for specific server-issued events at any 
 package main
 
 import (
-	"context"
 	"fmt"
 
 	"github.com/strongswan/govici/vici"
@@ -168,6 +167,11 @@ func main() {
 	}
 	defer session.Close()
 
+	ec := make(chan vici.Event, 16)
+
+	session.NotifyEvents(ec)
+	defer session.StopEvents(ec)
+
 	// Subscribe to 'ike-updown' and 'log' events.
 	if err := session.Subscribe("ike-updown", "log"); err != nil {
 		fmt.Println(err)
@@ -178,34 +182,31 @@ func main() {
 	name := "rw"
 
 	for {
-		e, err := session.NextEvent(context.Background())
-		if err != nil {
-			fmt.Println(err)
-			return
+		e := <-ec
+
+		// The Event.Name field corresponds to the event name
+		// we used to make the subscription. The Event.Message
+		// field contains the Message from the server.
+		switch e.Name {
+		case "ike-updown":
+			m, ok := e.Message.Get(name).(*vici.Message)
+			if !ok {
+				fmt.Printf("Expected *Message in field 'name', but got %T\n", e.Message.Get(name))
+				continue
+			}
+
+			state := m.Get("state")
+			fmt.Printf("IKE SA state changed (name=%s): %s\n", name, state)
+		case "log":
+			// Log events contain a 'msg' field with the log message
+			fmt.Println(e.Message.Get("msg"))
 		}
-
-                // The Event.Name field corresponds to the event name
-                // we used to make the subscription. The Event.Message
-                // field contains the Message from the server.
-                switch e.Name{
-                case "ike-updown":
-                        m, ok := e.Message.Get(name).(*vici.Message)
-                        if !ok {
-                                fmt.Printf("Expected *Message in field 'name', but got %T", m)
-                                continue
-                        }
-
-                        state := m.Get("state")
-		        fmt.Printf("IKE SA state changed (name=%s): %s\n", name, state)
-                case "log":
-                        // Log events contain a 'msg' field with the log message
-                        fmt.Println(e.Message.Get("msg"))
-                }
 	}
 }
+
 ```
 
-The `Session.NextEvent` function is used to read messages from the listener, and will block until the listener has received an event from the server, or until the supplied context is cancelled. Event subscriptions and unsubscriptions can be made at any time while the `Session` is active.
+The `Session.NotifyEvents` function is used to register a channel to receive `Event`'s on. The channel will continue to receive events as long as the `Session` is subscribed to events, or until `Session.StopEvents` is called with the same channel. Event subscriptions and unsubscriptions can be made at any time while the `Session` is active.
 
 ## Message Marshaling
 
