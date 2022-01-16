@@ -233,6 +233,9 @@ func (s *Session) UnsubscribeAll() error {
 // until an Event (or error) is received, or until the supplied context is closed.
 //
 // When the internal Event buffer is full, any new events will be discarded.
+//
+// Deprecated: Users should use NotifyEvents instead. NextEvent will be removed
+// from package vici before v1.0.
 func (s *Session) NextEvent(ctx context.Context) (Event, error) {
 	return s.el.nextEvent(ctx)
 }
