@@ -23,6 +23,7 @@ package vici
 import (
 	"context"
 	"flag"
+	"fmt"
 	"log"
 	"net"
 	"os/exec"
@@ -430,4 +431,138 @@ func TestCloseAfterEOF(t *testing.T) {
 			t.Fatalf("Failed to restart strongswan: %v", err)
 		}
 	}()
+}
+
+// TestNotifyEvents is a basic test for the Session.NotifyEvents method.
+func TestNotifyEvents(t *testing.T) {
+	maybeSkipIntegrationTest(t)
+
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+
+	ec := make(chan Event, 16)
+	s.NotifyEvents(ec)
+
+	if err := s.Subscribe("log"); err != nil {
+		t.Fatalf("Failed to start event listener: %v", err)
+	}
+	defer func() { _ = s.UnsubscribeAll() }()
+
+	if _, err := s.CommandRequest("reload-settings", nil); err != nil {
+		t.Fatalf("Failed to send 'reload-settings' command: %v", err)
+	}
+
+	select {
+	case <-ec:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Did not receive an event notification before timeout")
+	}
+
+	s.StopEvents(ec)
+
+	if _, err := s.CommandRequest("reload-settings", nil); err != nil {
+		t.Fatalf("Failed to send 'reload-settings' command: %v", err)
+	}
+
+	select {
+	case <-ec:
+		t.Fatal("Received event on chan after calling StopEvents")
+	case <-time.After(5 * time.Second):
+	}
+}
+
+// TestNotifyEventsMulti tests NotifyEvents with multiple chans registered, and ensures they
+// each receive the same Event, verified by timestamp.
+func TestNotifyEventsMulti(t *testing.T) {
+	maybeSkipIntegrationTest(t)
+
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+
+	evs := make([]Event, 3)
+	ecs := make([]chan Event, 3)
+	for i := range ecs {
+		ecs[i] = make(chan Event, 1)
+
+		s.NotifyEvents(ecs[i])
+		defer s.StopEvents(ecs[i])
+	}
+
+	if err := s.Subscribe("log"); err != nil {
+		t.Fatalf("Failed to start event listener: %v", err)
+	}
+	defer func() { _ = s.UnsubscribeAll() }()
+
+	if _, err := s.CommandRequest("reload-settings", nil); err != nil {
+		t.Fatalf("Failed to send 'reload-settings' command: %v", err)
+	}
+
+	for i := range evs {
+		evs[i] = <-ecs[i]
+	}
+
+	if !(evs[0].Timestamp.Equal(evs[1].Timestamp) && evs[1].Timestamp.Equal(evs[2].Timestamp)) {
+		t.Fatal("Received different events on multiple chans")
+	}
+}
+
+// TestNotifyEventsNoBlock makes sure that if a registered channel's buffer is full, event
+// writes do not block and other channels continue to receive data.
+func TestNotifyEventsNoBlock(t *testing.T) {
+	maybeSkipIntegrationTest(t)
+
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+
+	ec1 := make(chan Event, 4)
+	ec2 := make(chan Event, 1)
+
+	s.NotifyEvents(ec1)
+	defer s.StopEvents(ec1)
+
+	s.NotifyEvents(ec2)
+	defer s.StopEvents(ec2)
+
+	if err := s.Subscribe("log"); err != nil {
+		t.Fatalf("Failed to start event listener: %v", err)
+	}
+	defer func() { _ = s.UnsubscribeAll() }()
+
+	go func() {
+		for i := 0; i < 4; i++ {
+			<-time.After(100 * time.Millisecond)
+
+			if _, err := s.CommandRequest("reload-settings", nil); err != nil {
+				fmt.Printf("Failed to send 'reload-settings' command: %v", err)
+				return
+			}
+		}
+	}()
+
+	var ev1, ev2 Event
+	for i := 0; i < 4; i++ {
+		if i == 0 {
+			ev1 = <-ec1
+			continue
+		}
+
+		<-ec1
+	}
+	ev2 = <-ec2
+
+	if !ev1.Timestamp.Equal(ev2.Timestamp) {
+		t.Fatal("Unexpected NotifyEvents behavior")
+	}
+
+	select {
+	case <-ec2:
+		t.Fatal("No more events should have been written to chan with buffer size 1")
+	default:
+	}
 }
