@@ -431,3 +431,80 @@ func TestCloseAfterEOF(t *testing.T) {
 		}
 	}()
 }
+
+// TestNotifyEvents is a basic test for the Session.NotifyEvents method.
+func TestNotifyEvents(t *testing.T) {
+	maybeSkipIntegrationTest(t)
+
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+
+	ec := make(chan Event, 16)
+	s.NotifyEvents(ec)
+
+	if err := s.Subscribe("log"); err != nil {
+		t.Fatalf("Failed to start event listener: %v", err)
+	}
+	defer func() { _ = s.UnsubscribeAll() }()
+
+	if _, err := s.CommandRequest("reload-settings", nil); err != nil {
+		t.Fatalf("Failed to send 'reload-settings' command: %v", err)
+	}
+
+	select {
+	case <-ec:
+	case <-time.After(5 * time.Second):
+		t.Fatal("Did not receive an event notification before timeout")
+	}
+
+	s.StopEvents(ec)
+
+	if _, err := s.CommandRequest("reload-settings", nil); err != nil {
+		t.Fatalf("Failed to send 'reload-settings' command: %v", err)
+	}
+
+	select {
+	case <-ec:
+		t.Fatal("Received event on chan after calling StopEvents")
+	case <-time.After(5 * time.Second):
+	}
+}
+
+// TestNotifyEventsMulti tests NotifyEvents with multiple chans registered, and ensures they
+// each receive the same Event, verified by timestamp.
+func TestNotifyEventsMulti(t *testing.T) {
+	maybeSkipIntegrationTest(t)
+
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+
+	evs := make([]Event, 3)
+	ecs := make([]chan Event, 3)
+	for i := range ecs {
+		ecs[i] = make(chan Event, 1)
+
+		s.NotifyEvents(ecs[i])
+		defer s.StopEvents(ecs[i])
+	}
+
+	if err := s.Subscribe("log"); err != nil {
+		t.Fatalf("Failed to start event listener: %v", err)
+	}
+	defer func() { _ = s.UnsubscribeAll() }()
+
+	if _, err := s.CommandRequest("reload-settings", nil); err != nil {
+		t.Fatalf("Failed to send 'reload-settings' command: %v", err)
+	}
+
+	for i := range evs {
+		evs[i] = <-ecs[i]
+	}
+
+	if !(evs[0].Timestamp.Equal(evs[1].Timestamp) && evs[1].Timestamp.Equal(evs[2].Timestamp)) {
+		t.Fatal("Received different events on multiple chans")
+	}
+}
