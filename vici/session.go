@@ -235,6 +235,9 @@ func (s *Session) UnsubscribeAll() error {
 // When the internal Event buffer is full, for example if NextEvent is not called frequently enough
 // to keep up with the event rate, the oldest Event is discarded from the buffer to make room for the
 // new Event.
+//
+// Deprecated: Users should use NotifyEvents instead. NextEvent will be removed
+// from package vici before v1.0.
 func (s *Session) NextEvent(ctx context.Context) (Event, error) {
 	return s.el.nextEvent(ctx)
 }
