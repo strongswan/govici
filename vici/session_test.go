@@ -93,41 +93,6 @@ func mockCharon(ctx context.Context) net.Conn {
 	return client
 }
 
-func TestSubscribeAndCloseSession(t *testing.T) {
-	dctx, dcancel := context.WithCancel(context.Background())
-	defer dcancel()
-
-	conn := mockCharon(dctx)
-
-	s, err := NewSession(withTestConn(conn))
-	if err != nil {
-		t.Fatalf("Failed to create session: %v", err)
-	}
-	defer s.Close()
-
-	err = s.Subscribe("test-event")
-	if err != nil {
-		t.Fatalf("Failed to start event listener: %v", err)
-	}
-
-	e, err := s.NextEvent(context.TODO())
-	if err != nil {
-		t.Fatalf("Unexpected error on NextEvent: %v", err)
-	}
-
-	if e.Message.Get("test") != "hello world!" {
-		t.Fatalf("Unexpected message: %v", e)
-	}
-
-	// Close session
-	s.Close()
-
-	e, err = s.NextEvent(context.TODO())
-	if err == nil {
-		t.Fatalf("Expected error after closing listener, got message: %v", e)
-	}
-}
-
 func TestSessionClose(t *testing.T) {
 	// Create a session without connecting to charon
 	conn, _ := net.Pipe()
@@ -245,44 +210,9 @@ func TestSubscribeWhenAlreadyActive(t *testing.T) {
 	}
 }
 
-func TestCloseWithActiveNextEvent(t *testing.T) {
-	maybeSkipIntegrationTest(t)
-
-	s, err := NewSession()
-	if err != nil {
-		t.Fatalf("Failed to create session: %v", err)
-	}
-
-	if err := s.Subscribe("ike-updown"); err != nil {
-		t.Fatalf("Failed to start event listener: %v", err)
-	}
-
-	done := make(chan struct{}, 1)
-
-	go func() {
-		defer close(done)
-
-		_, err := s.NextEvent(context.TODO())
-		if err == nil {
-			t.Errorf("Expected error when reading event from closed listener")
-		}
-	}()
-
-	// Sleep before closing to ensure that NextEvent is called
-	// before Close.
-	<-time.After(3 * time.Second)
-
-	if err := s.Close(); err != nil {
-		t.Fatalf("Unexpected error closing session: %v", err)
-	}
-
-	<-done
-}
-
-// TestEventNameIsSet tests NextEvent by making sure the event
-// type name is properly set in the returned Event. This is done
-// by listening for -- and triggering -- a 'log' event. The event
-// is triggered by a call to 'reload-settings'.
+// TestEventNameIsSet tests that the event type name is properly set in the
+// returned Event. This is done by listening for -- and triggering -- a 'log'
+// event. The event is triggered by a call to 'reload-settings'.
 func TestEventNameIsSet(t *testing.T) {
 	maybeSkipIntegrationTest(t)
 
@@ -291,6 +221,12 @@ func TestEventNameIsSet(t *testing.T) {
 		t.Fatalf("Failed to create session: %v", err)
 	}
 	defer s.Close()
+
+	ec := make(chan Event, 1)
+	defer close(ec)
+
+	s.NotifyEvents(ec)
+	defer s.StopEvents(ec)
 
 	if err := s.Subscribe("log"); err != nil {
 		t.Fatalf("Failed to start event listener: %v", err)
@@ -301,37 +237,9 @@ func TestEventNameIsSet(t *testing.T) {
 		t.Fatalf("Failed to send 'reload-settings' command: %v", err)
 	}
 
-	e, err := s.NextEvent(context.TODO())
-	if err != nil {
-		t.Fatalf("Unexpected error waiting for event: %v", err)
-	}
-
+	e := <-ec
 	if e.Name != "log" {
 		t.Fatalf("Expected to receive 'log' event, got %s", e.Name)
-	}
-}
-
-// TestNextEventCancel ensures that a cancelled context will cause a
-// blocking NextEvent call to return.
-func TestNextEventCancel(t *testing.T) {
-	maybeSkipIntegrationTest(t)
-
-	s, err := NewSession()
-	if err != nil {
-		t.Fatalf("Failed to create session: %v", err)
-	}
-	defer s.Close()
-
-	if err := s.Subscribe("ike-updown"); err != nil {
-		t.Fatalf("Failed to start event listener: %v", err)
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
-	defer cancel()
-
-	_, err = s.NextEvent(ctx)
-	if err != ctx.Err() {
-		t.Fatalf("Expected to get context's timeout error after not receiving event, got: %v", err)
 	}
 }
 
@@ -375,6 +283,12 @@ func TestUnsubscribe(t *testing.T) {
 	}
 	defer s.Close()
 
+	ec := make(chan Event, 1)
+	defer close(ec)
+
+	s.NotifyEvents(ec)
+	defer s.StopEvents(ec)
+
 	if err := s.Subscribe("log"); err != nil {
 		t.Fatalf("Failed to start event listener: %v", err)
 	}
@@ -383,8 +297,9 @@ func TestUnsubscribe(t *testing.T) {
 		t.Fatalf("Failed to send 'reload-settings' command: %v", err)
 	}
 
-	_, err = s.NextEvent(context.TODO())
-	if err != nil {
+	select {
+	case <-ec:
+	case <-time.After(3 * time.Second):
 		t.Fatalf("Unexpected error waiting for event: %v", err)
 	}
 
@@ -392,14 +307,14 @@ func TestUnsubscribe(t *testing.T) {
 		t.Fatalf("Unexpected error unsubscribing from 'log' event: %v", err)
 	}
 
-	// Now, call reload-settings again and make sure no event is received.
-	// We'll say 3 seconds is enough to say the event was not received...
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
-	defer cancel()
+	if _, err := s.CommandRequest("reload-settings", nil); err != nil {
+		t.Fatalf("Failed to send 'reload-settings' command: %v", err)
+	}
 
-	_, err = s.NextEvent(ctx)
-	if err != ctx.Err() {
-		t.Fatalf("Expected to get timeout error since event should not be received, got: %v", err)
+	select {
+	case <-ec:
+		t.Fatal("Should not have received event after Unsubsubscribe")
+	case <-time.After(3 * time.Second):
 	}
 }
 
