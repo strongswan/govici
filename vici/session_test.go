@@ -118,7 +118,7 @@ func TestStreamedCommandRequest(t *testing.T) {
 		t.Fatalf("Failed to list authorities: %v", err)
 	}
 
-	for i, m := range ms.Messages() {
+	for i, m := range ms {
 		if m.Err() != nil {
 			t.Fatalf("Got error in message #%d: %v", i+1, m.Err())
 		}

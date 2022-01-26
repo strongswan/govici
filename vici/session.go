@@ -205,7 +205,7 @@ func (s *Session) CommandRequest(cmd string, msg *Message) (*Message, error) {
 // behaves like CommandRequest, but accepts an event argument, which specifies the event type
 // to stream while the command request is active. The complete stream of messages received from
 // the server is returned once the request is complete.
-func (s *Session) StreamedCommandRequest(cmd string, event string, msg *Message) (*MessageStream, error) {
+func (s *Session) StreamedCommandRequest(cmd string, event string, msg *Message) ([]*Message, error) {
 	return s.sendStreamedRequest(cmd, event, msg)
 }
 

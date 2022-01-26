@@ -49,7 +49,7 @@ func (s *Session) sendRequest(cmd string, msg *Message) (*Message, error) {
 	return p.msg, nil
 }
 
-func (s *Session) sendStreamedRequest(cmd string, event string, msg *Message) (*MessageStream, error) {
+func (s *Session) sendStreamedRequest(cmd string, event string, msg *Message) ([]*Message, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -61,7 +61,7 @@ func (s *Session) sendStreamedRequest(cmd string, event string, msg *Message) (*
 	return s.handleStreamedRequest(cmd, event, msg)
 }
 
-func (s *Session) handleStreamedRequest(cmd, event string, msg *Message) (*MessageStream, error) {
+func (s *Session) handleStreamedRequest(cmd, event string, msg *Message) ([]*Message, error) {
 	// nolint
 	defer s.streamEventRegisterUnregister(event, false)
 
@@ -93,7 +93,7 @@ func (s *Session) handleStreamedRequest(cmd, event string, msg *Message) (*Messa
 	}
 	messages = append(messages, p.msg)
 
-	return NewMessageStream(messages...), nil
+	return messages, nil
 }
 
 // streamEventRegisterUnregister will (un)register the given event type, based on the register boolean.

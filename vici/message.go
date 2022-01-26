@@ -84,26 +84,6 @@ var (
 	errUnmarshalParseFailure    = fmt.Errorf("%v: failed to parse value", errUnmarshal)
 )
 
-// MessageStream is used to feed continuous data during a command request, and simply
-// contains a slice of *Message.
-//
-// Deprecated: MessageStream will be removed prior to v1.0 in favor of using
-// the type []*Message instead.
-type MessageStream struct {
-	// Message list
-	messages []*Message
-}
-
-// NewMessageStream returns a new MessageStream.
-func NewMessageStream(messages ...*Message) *MessageStream {
-	return &MessageStream{messages: messages}
-}
-
-// Messages returns the messages received from the streamed request.
-func (ms *MessageStream) Messages() []*Message {
-	return ms.messages
-}
-
 // Message represents a vici message as described in the vici README:
 //
 //     https://www.strongswan.org/apidoc/md_src_libcharon_plugins_vici_README.html
