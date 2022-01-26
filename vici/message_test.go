@@ -271,7 +271,8 @@ func TestMarshalMessageMap(t *testing.T) {
 	}
 
 	// Map keys are unordered, so we need to compare differently
-	marshaledKeys := append(goldMarshaled.keys[:0:0], goldMarshaled.keys...)
+	marshaledKeys := make([]string, len(goldMarshaled.keys))
+	copy(marshaledKeys, goldMarshaled.keys)
 	sort.Strings(m.keys)
 	sort.Strings(marshaledKeys)
 
