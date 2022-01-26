@@ -21,77 +21,14 @@
 package vici
 
 import (
-	"context"
 	"flag"
 	"fmt"
-	"log"
 	"net"
 	"os/exec"
 	"reflect"
 	"testing"
 	"time"
 )
-
-func mockCharon(ctx context.Context) net.Conn {
-	client, srvr := net.Pipe()
-
-	go func() {
-		defer func() {
-			srvr.Close()
-		}()
-
-		tr := &transport{conn: srvr}
-
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			default:
-				break
-			}
-
-			p, err := tr.recv()
-			if err != nil {
-				return
-			}
-
-			switch p.ptype {
-			case pktEventRegister, pktEventUnregister:
-				var ack *packet
-
-				if p.name != "test-event" {
-					ack = newPacket(pktEventUnknown, "", nil)
-				} else {
-					ack = newPacket(pktEventConfirm, "", nil)
-				}
-
-				err := tr.send(ack)
-				if err != nil {
-					return
-				}
-
-				if p.ptype == pktEventRegister && ack.ptype == pktEventConfirm {
-					// Write one event message
-					msg := NewMessage()
-					err := msg.Set("test", "hello world!")
-					if err != nil {
-						log.Printf("Failed to set message field: %v", err)
-					}
-					event := newPacket(pktEvent, "test-event", msg)
-					err = tr.send(event)
-					if err != nil {
-						log.Printf("Failed to send test-event message: %v", err)
-					}
-				}
-
-			default:
-				continue
-			}
-		}
-	}()
-
-	return client
-}
 
 func TestSessionClose(t *testing.T) {
 	// Create a session without connecting to charon
