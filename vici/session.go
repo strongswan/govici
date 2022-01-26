@@ -229,17 +229,6 @@ func (s *Session) UnsubscribeAll() error {
 	return s.el.unregisterEvents(nil, true)
 }
 
-// NextEvent returns the next event received by the session event listener.  NextEvent will block
-// until an Event (or error) is received, or until the supplied context is closed.
-//
-// When the internal Event buffer is full, any new events will be discarded.
-//
-// Deprecated: Users should use NotifyEvents instead. NextEvent will be removed
-// from package vici before v1.0.
-func (s *Session) NextEvent(ctx context.Context) (Event, error) {
-	return s.el.nextEvent(ctx)
-}
-
 // NotifyEvents registers c for writing received events. The Session must first
 // subscribe to events using the Subscribe method.
 //

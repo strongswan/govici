@@ -21,24 +21,14 @@
 package vici
 
 import (
-	"context"
-	"errors"
 	"fmt"
 	"io"
 	"sync"
 	"time"
 )
 
-var (
-	// Event listener channel was closed
-	errChannelClosed = errors.New("vici: event listener channel closed")
-)
-
 type eventListener struct {
 	*transport
-
-	// Event channel and the events it's listening for.
-	ec chan Event
 
 	// Lock events when registering and unregistering.
 	mu     sync.Mutex
@@ -71,12 +61,9 @@ type Event struct {
 func newEventListener(t *transport) *eventListener {
 	el := &eventListener{
 		transport: t,
-		ec:        make(chan Event, 16),
 		pc:        make(chan *packet, 4),
 		chans:     make(map[chan<- Event]struct{}),
 	}
-
-	el.notify(el.ec)
 
 	go el.listen()
 
@@ -102,9 +89,7 @@ func (el *eventListener) Close() error {
 func (el *eventListener) listen() {
 	// Clean up the event channel when this loop is closed. This
 	// ensures any active NextEvent callers return.
-	defer close(el.ec)
 	defer close(el.pc)
-	defer el.stop(el.ec)
 
 	for {
 		p, err := el.recv()
@@ -156,20 +141,6 @@ func (el *eventListener) dispatch(e Event) {
 		case c <- e:
 		default:
 		}
-	}
-}
-
-func (el *eventListener) nextEvent(ctx context.Context) (Event, error) {
-	select {
-	case <-ctx.Done():
-		return Event{}, ctx.Err()
-
-	case e, ok := <-el.ec:
-		if !ok {
-			return Event{}, errChannelClosed
-		}
-
-		return e, nil
 	}
 }
 
