@@ -12,6 +12,8 @@ jobs:
       uses: actions/setup-go@v2
       with:
         go-version: ${{ matrix.go-version }}
+    - name: apt update
+      run: sudo apt update
     - name: Install strongswan
       run: sudo apt install strongswan-charon strongswan-swanctl charon-systemd -y
     - name: Start strongswan
