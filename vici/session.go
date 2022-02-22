@@ -22,7 +22,9 @@ package vici
 
 import (
 	"context"
+	"fmt"
 	"net"
+	"runtime"
 	"sync"
 )
 
@@ -45,12 +47,24 @@ type Session struct {
 
 // NewSession returns a new vici session.
 func NewSession(opts ...SessionOption) (*Session, error) {
+
+	var socketPath string
+	var network string
+	fmt.Println("os type: " + runtime.GOOS)
+	if runtime.GOOS == "windows" {
+		network = "tcp"
+		socketPath = windowsdefaultSocketPath
+	} else {
+		network = "unix"
+		socketPath = defaultSocketPath
+	}
+
 	s := &Session{
 		// Set default session opts before applying
 		// the opts passed by the caller.
 		sessionOpts: &sessionOpts{
-			network: "unix",
-			addr:    defaultSocketPath,
+			network: network,
+			addr:    socketPath,
 			dialer:  (&net.Dialer{}).DialContext,
 			conn:    nil,
 		},

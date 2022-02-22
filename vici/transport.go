@@ -29,7 +29,8 @@ import (
 
 const (
 	// Default unix socket path
-	defaultSocketPath = "/var/run/charon.vici"
+	defaultSocketPath        = "/var/run/charon.vici"
+	windowsdefaultSocketPath = "127.0.0.1:4502"
 
 	// Each segment is prefixed by a 4-byte header in network oreder
 	headerLength = 4
