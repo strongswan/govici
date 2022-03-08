@@ -103,6 +103,7 @@ func (s *Session) Close() error {
 	}
 
 	s.mu.Lock()
+	defer s.mu.Unlock()
 	if s.ctr != nil {
 		if err := s.ctr.conn.Close(); err != nil {
 			return err
@@ -110,7 +111,6 @@ func (s *Session) Close() error {
 
 		s.ctr = nil
 	}
-	s.mu.Unlock()
 
 	return nil
 }
