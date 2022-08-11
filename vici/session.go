@@ -49,8 +49,8 @@ func NewSession(opts ...SessionOption) (*Session, error) {
 		// Set default session opts before applying
 		// the opts passed by the caller.
 		sessionOpts: &sessionOpts{
-			network: "unix",
-			addr:    defaultSocketPath,
+			network: sessionDefaultNetwork,
+			addr:    sessionDefaultAddr,
 			dialer:  (&net.Dialer{}).DialContext,
 			conn:    nil,
 		},
