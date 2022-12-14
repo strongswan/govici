@@ -86,7 +86,7 @@ var (
 
 // Message represents a vici message as described in the vici README:
 //
-//     https://www.strongswan.org/apidoc/md_src_libcharon_plugins_vici_README.html
+//	https://www.strongswan.org/apidoc/md_src_libcharon_plugins_vici_README.html
 //
 // A message supports encoding key-value pairs, lists, and sub-sections (or sub-messages).
 // Within a Message, each value, list, and sub-section is keyed by a string.
@@ -154,13 +154,13 @@ func UnmarshalMessage(m *Message, v interface{}) error {
 // If the type of v is supported, it is represented in the message as either a
 // string, []string, or *Message. The currently supported types are:
 //
-//  - string
-//  - integer types (converted to string)
-//  - bool (where true and false are converted to the strings "yes" and "no", respectively)
-//  - []string
-//  - *Message
-//  - map (the map must be valid as per MarshalMessage)
-//  - struct (the struct must be valid as per MarshalMessage)
+//   - string
+//   - integer types (converted to string)
+//   - bool (where true and false are converted to the strings "yes" and "no", respectively)
+//   - []string
+//   - *Message
+//   - map (the map must be valid as per MarshalMessage)
+//   - struct (the struct must be valid as per MarshalMessage)
 //
 // Pointer types of the above are allowed and can be used to differentiate between
 // an unset value and a zero value. If a pointer is nil, it is not added to the message.

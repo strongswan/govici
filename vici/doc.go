@@ -22,7 +22,7 @@
 // documented here. For a complete overview and specification of the vici
 // protocol visit:
 //
-//     https://www.strongswan.org/apidoc/md_src_libcharon_plugins_vici_README.html
+//	https://www.strongswan.org/apidoc/md_src_libcharon_plugins_vici_README.html
 //
 // The vici package has two important types that the API is built around. The
 // first is the Session type, which provides communication to the charon daemon
@@ -46,11 +46,11 @@
 // as the first argument to Session.CommandRequest. Each command has its IN
 // and OUT message parameters defined, i.e.:
 //
-//      {
-//          <message IN parameters>
-//      } => {
-//          <message OUT parameters>
-//      }
+//	{
+//	    <message IN parameters>
+//	} => {
+//	    <message OUT parameters>
+//	}
 //
 // The Message that defines the IN parameters is passed as the second argument
 // to Session.CommandRequest. If no IN parameters are required, you can
