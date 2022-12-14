@@ -32,16 +32,16 @@ var (
 	// Gold message
 	goldMessage = &Message{
 		keys: []string{"key1", "section1"},
-		data: map[string]interface{}{
+		data: map[string]any{
 			"key1": "value1",
 			// Section is another message
 			"section1": &Message{
 				keys: []string{"sub-section", "list1"},
-				data: map[string]interface{}{
+				data: map[string]any{
 					// Sub-section is a another message
 					"sub-section": &Message{
 						keys: []string{"key2"},
-						data: map[string]interface{}{
+						data: map[string]any{
 							"key2": "value2",
 						},
 					},
@@ -80,7 +80,7 @@ var (
 		List: []string{"item1", "item2"},
 		Message: &Message{
 			keys: []string{"key1"},
-			data: map[string]interface{}{
+			data: map[string]any{
 				"key1": "value1",
 			},
 		},
@@ -88,7 +88,7 @@ var (
 		Section2: &testSection{List: []string{"item3", "item4"}},
 	}
 
-	goldUnmarshaledMap = map[string]interface{}{
+	goldUnmarshaledMap = map[string]any{
 		"key":      goldUnmarshaled.Key,
 		"list":     goldUnmarshaled.List,
 		"message":  goldUnmarshaled.Message,
@@ -98,24 +98,24 @@ var (
 
 	goldMarshaled = &Message{
 		keys: []string{"key", "list", "message", "section1", "section2"},
-		data: map[string]interface{}{
+		data: map[string]any{
 			"key":  "value",
 			"list": []string{"item1", "item2"},
 			"message": &Message{
 				keys: []string{"key1"},
-				data: map[string]interface{}{
+				data: map[string]any{
 					"key1": "value1",
 				},
 			},
 			"section1": &Message{
 				keys: []string{"key"},
-				data: map[string]interface{}{
+				data: map[string]any{
 					"key": "key2",
 				},
 			},
 			"section2": &Message{
 				keys: []string{"list"},
-				data: map[string]interface{}{
+				data: map[string]any{
 					"list": []string{"item3", "item4"},
 				},
 			},
@@ -171,24 +171,24 @@ func ExampleMarshalMessage() {
 	}
 
 	type conn struct {
-		LocalAddrs   []string               `vici:"local_addrs"`
-		Local        map[string]interface{} `vici:"local"`
-		Remote       map[string]interface{} `vici:"remote"`
-		Children     map[string]child       `vici:"children"`
-		IKEVersion   uint                   `vici:"version"`
-		IKEProposals []string               `vici:"proposals"`
+		LocalAddrs   []string         `vici:"local_addrs"`
+		Local        map[string]any   `vici:"local"`
+		Remote       map[string]any   `vici:"remote"`
+		Children     map[string]child `vici:"children"`
+		IKEVersion   uint             `vici:"version"`
+		IKEProposals []string         `vici:"proposals"`
 	}
 
 	// Create a Message that represents the 'rw' connection from this swanctl.conf:
 	// https://www.strongswan.org/testing/testresults/swanctl/rw-cert/moon.swanctl.conf
 	rw := &conn{
 		LocalAddrs: []string{"192.168.0.1"},
-		Local: map[string]interface{}{
+		Local: map[string]any{
 			"auth":  "pubkey",
 			"certs": []string{"moonCert.pem"},
 			"id":    "moon.strongswan.org",
 		},
-		Remote: map[string]interface{}{
+		Remote: map[string]any{
 			"auth": "pubkey",
 		},
 		Children: map[string]child{
@@ -304,7 +304,7 @@ func TestUnmarshalMessage(t *testing.T) {
 func TestUnmarshalMessageMapSimple(t *testing.T) {
 	marshaled := &Message{
 		keys: []string{"one", "two"},
-		data: map[string]interface{}{
+		data: map[string]any{
 			"one": "1",
 			"two": "2",
 		},
@@ -337,7 +337,7 @@ func TestUnmarshalMessageMapSimple(t *testing.T) {
 func TestUnmarshalMessageMapPointers(t *testing.T) {
 	marshaled := &Message{
 		keys: []string{"section1", "section2"},
-		data: map[string]interface{}{
+		data: map[string]any{
 			"section1": goldMarshaled.data["section1"],
 			"section2": goldMarshaled.data["section2"],
 		},
@@ -362,7 +362,7 @@ func TestUnmarshalMessageMapPointers(t *testing.T) {
 func TestUnmarshalMessageMapNotPointers(t *testing.T) {
 	marshaled := &Message{
 		keys: []string{"section1", "section2"},
-		data: map[string]interface{}{
+		data: map[string]any{
 			"section1": goldMarshaled.data["section1"],
 			"section2": goldMarshaled.data["section2"]},
 	}
@@ -465,7 +465,7 @@ func TestMessageGet(t *testing.T) {
 
 func TestMessageSet(t *testing.T) {
 	// Test that all supported types can be set.
-	valid := []interface{}{
+	valid := []any{
 		// type: string
 		"value",
 
@@ -482,7 +482,7 @@ func TestMessageSet(t *testing.T) {
 		true,
 
 		// type: map
-		map[string]interface{}{
+		map[string]any{
 			"key1": "value1",
 			"key2": []string{"item1", "item2"},
 		},
@@ -507,7 +507,7 @@ func TestMessageSet(t *testing.T) {
 func TestMessageUnset(t *testing.T) {
 	m1 := &Message{
 		keys: []string{"test1", "test2", "test3", "test4"},
-		data: map[string]interface{}{
+		data: map[string]any{
 			"test1": 1,
 			"test2": 2,
 			"test3": 3,
@@ -517,7 +517,7 @@ func TestMessageUnset(t *testing.T) {
 
 	m2 := &Message{
 		keys: []string{"test1", "test2", "test4"},
-		data: map[string]interface{}{
+		data: map[string]any{
 			"test1": 1,
 			"test2": 2,
 			"test4": 4,
@@ -539,8 +539,8 @@ func TestMessageUnset(t *testing.T) {
 
 func TestMessageSetTypeConversion(t *testing.T) {
 	type conversion struct {
-		in  interface{}
-		out interface{}
+		in  any
+		out any
 	}
 
 	conversions := []conversion{
@@ -650,9 +650,9 @@ func TestEmptyMessageElement(t *testing.T) {
 		reflect.ValueOf([]string{}):                 true,
 		reflect.ValueOf([]string(nil)):              true,
 		/* nil or zero-length maps should be empty */
-		reflect.ValueOf(map[string]interface{}{"test": 0}): false,
-		reflect.ValueOf(map[string]interface{}{}):          true,
-		reflect.ValueOf(map[string]interface{}(nil)):       true,
+		reflect.ValueOf(map[string]any{"test": 0}): false,
+		reflect.ValueOf(map[string]any{}):          true,
+		reflect.ValueOf(map[string]any(nil)):       true,
 		/* a struct is empty if each of its fields are empty */
 		reflect.ValueOf(struct{ Test string }{"test"}): false,
 		reflect.ValueOf(struct{ Test string }{}):       true,

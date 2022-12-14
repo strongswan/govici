@@ -98,14 +98,14 @@ var (
 type Message struct {
 	keys []string
 
-	data map[string]interface{}
+	data map[string]any
 }
 
 // NewMessage returns an empty Message.
 func NewMessage() *Message {
 	return &Message{
 		keys: make([]string, 0),
-		data: make(map[string]interface{}),
+		data: make(map[string]any),
 	}
 }
 
@@ -128,7 +128,7 @@ func NewMessage() *Message {
 // element if it would be encoded as either an empty string, zero-length []string or nil. On the other hand,
 // an integer's zero value is 0, but this is marshaled to the string "0", and will not be omitted from marshaling.
 // Likewise, a bool's zero value is false, which is marshaled to the string "no".
-func MarshalMessage(v interface{}) (*Message, error) {
+func MarshalMessage(v any) (*Message, error) {
 	m := NewMessage()
 	if err := m.marshal(v); err != nil {
 		return nil, err
@@ -144,7 +144,7 @@ func MarshalMessage(v interface{}) (*Message, error) {
 //
 // An error is returned if the underlying value of v cannot be unmarshaled into, or
 // an unsupported type is encountered.
-func UnmarshalMessage(m *Message, v interface{}) error {
+func UnmarshalMessage(m *Message, v any) error {
 	return m.unmarshal(v)
 }
 
@@ -167,7 +167,7 @@ func UnmarshalMessage(m *Message, v interface{}) error {
 //
 // If the key already exists the value is overwritten, but the ordering
 // of the message is not changed.
-func (m *Message) Set(key string, value interface{}) error {
+func (m *Message) Set(key string, value any) error {
 	return m.marshalField(key, reflect.ValueOf(value))
 }
 
@@ -194,7 +194,7 @@ func (m *Message) Unset(key string) {
 //
 // The value returned by Get is the internal message representation of that
 // field, which means the type is either string, []string, or *Message.
-func (m *Message) Get(key string) interface{} {
+func (m *Message) Get(key string) any {
 	v, ok := m.data[key]
 	if !ok {
 		return nil
@@ -224,7 +224,7 @@ func (m *Message) Err() error {
 	return nil
 }
 
-func (m *Message) addItem(key string, value interface{}) error {
+func (m *Message) addItem(key string, value any) error {
 	// Check if the key is already set in the message
 	_, exists := m.data[key]
 
@@ -249,7 +249,7 @@ func (m *Message) addItem(key string, value interface{}) error {
 
 type messageElement struct {
 	k string
-	v interface{}
+	v any
 }
 
 func (m *Message) elements() []messageElement {
@@ -785,7 +785,7 @@ func emptyMessageElement(rv reflect.Value) bool {
 	return false
 }
 
-func (m *Message) marshal(v interface{}) error {
+func (m *Message) marshal(v any) error {
 	rv := reflect.ValueOf(v)
 
 	if rv.Kind() == reflect.Ptr {
@@ -902,7 +902,7 @@ func (m *Message) marshalField(name string, rv reflect.Value) error {
 	}
 }
 
-func (m *Message) unmarshal(v interface{}) error {
+func (m *Message) unmarshal(v any) error {
 	rv := reflect.ValueOf(v)
 
 	switch rv.Kind() {

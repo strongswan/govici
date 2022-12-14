@@ -32,7 +32,7 @@ var (
 		name:  "install",
 		msg: &Message{
 			keys: []string{"child", "ike"},
-			data: map[string]interface{}{
+			data: map[string]any{
 				"child": "test-CHILD_SA",
 				"ike":   "test-IKE_SA",
 			},
@@ -56,7 +56,7 @@ var (
 		ptype: pktCmdResponse,
 		msg: &Message{
 			keys: []string{"success", "errmsg"},
-			data: map[string]interface{}{
+			data: map[string]any{
 				"success": "no",
 				"errmsg":  "failed to install CHILD_SA",
 			},

@@ -297,10 +297,10 @@ func TestMarshalEnumType(t *testing.T) {
 }
 
 func TestMarshalEmbeddedMap(t *testing.T) {
-	mapValue := map[string]interface{}{"sub": goldUnmarshaled}
+	mapValue := map[string]any{"sub": goldUnmarshaled}
 
 	mapMessage := struct {
-		Field map[string]interface{} `vici:"field"`
+		Field map[string]any `vici:"field"`
 	}{
 		Field: mapValue,
 	}
