@@ -584,3 +584,40 @@ func TestNotifyEventsNoBlock(t *testing.T) {
 	default:
 	}
 }
+
+// TestNotifyEventsChanCloseOnSessionClose makes sure that when the event listener stops,
+// all registered channels are closed, so that they are not left waiting forever.
+//
+// Related to https://github.com/strongswan/govici/issues/46
+func TestNotifyEventsChanCloseOnSessionClose(t *testing.T) {
+	maybeSkipIntegrationTest(t)
+
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+
+	ecs := make([]chan Event, 3)
+	for i := range ecs {
+		ecs[i] = make(chan Event, 1)
+
+		s.NotifyEvents(ecs[i])
+		defer s.StopEvents(ecs[i])
+	}
+
+	if err := s.Subscribe("log"); err != nil {
+		t.Fatalf("Failed to start event listener: %v", err)
+	}
+	defer func() { _ = s.UnsubscribeAll() }()
+
+	if err := s.Close(); err != nil {
+		t.Fatalf("Unpexected error when closing session: %v", err)
+	}
+
+	for i := range ecs {
+		_, ok := <-ecs[i]
+		if ok {
+			t.Fatal("Expected channel to be closed after session was closed")
+		}
+	}
+}
