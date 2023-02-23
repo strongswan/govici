@@ -159,6 +159,24 @@ func TestIdempotentSessionClose(t *testing.T) {
 	}
 }
 
+func TestCommandRequestAfterClose(t *testing.T) {
+	conn, _ := net.Pipe()
+
+	s, err := NewSession(withTestConn(conn))
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+
+	if err := s.Close(); err != nil {
+		t.Fatalf("Unpexected error when closing Session (first close): %v", err)
+	}
+
+	_, err = s.CommandRequest("version", nil)
+	if err == nil {
+		t.Fatalf("Expected error when attempting command on closed session")
+	}
+}
+
 // These tests are considered 'integration' tests because they require charon
 // to be running, and make actual client-issued commands. Note that these are
 // only meant to test the package API, and the specific commands used are out
