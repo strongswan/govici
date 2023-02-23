@@ -102,9 +102,9 @@ func (el *eventListener) Close() error {
 func (el *eventListener) listen() {
 	// Clean up the event channel when this loop is closed. This
 	// ensures any active NextEvent callers return.
-	defer close(el.ec)
 	defer close(el.pc)
 	defer el.stop(el.ec)
+	defer el.closeAllChans()
 
 	for {
 		p, err := el.recv()
@@ -145,6 +145,15 @@ func (el *eventListener) stop(c chan<- Event) {
 	defer el.muChans.Unlock()
 
 	delete(el.chans, c)
+}
+
+func (el *eventListener) closeAllChans() {
+	el.muChans.Lock()
+	defer el.muChans.Unlock()
+
+	for c := range el.chans {
+		close(c)
+	}
 }
 
 func (el *eventListener) dispatch(e Event) {
