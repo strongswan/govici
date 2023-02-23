@@ -37,6 +37,10 @@ func (s *Session) sendRequest(cmd string, msg *Message) (*Message, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
+	if s.ctr == nil {
+		return nil, errors.New("session closed")
+	}
+
 	p, err := s.cmdTransportCommunicate(newPacket(pktCmdRequest, cmd, msg))
 	if err != nil {
 		return nil, err
@@ -52,6 +56,10 @@ func (s *Session) sendRequest(cmd string, msg *Message) (*Message, error) {
 func (s *Session) sendStreamedRequest(cmd string, event string, msg *Message) (*MessageStream, error) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+
+	if s.ctr == nil {
+		return nil, errors.New("session closed")
+	}
 
 	err := s.streamEventRegisterUnregister(event, true)
 	if err != nil {
