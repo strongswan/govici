@@ -3,6 +3,21 @@ All notable changes to govici will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.7.0] - 2023-02-24
+
+### Changed
+- Fix a bug where mutex may not be Unlock()'d in Session.Close().
+- Make sure registered event channels are closed when the event listener exits:
+  https://github.com/strongswan/govici/issues/46.
+- Prevent panics after closing the session.
+- Set GOOS appropriate defaults at build time.
+- Bring the CI up to date and fix some linting errors.
+- Lazily start the event listener loop the first time Subscribe() is called.
+
+### Removed
+- Session.NextEvent API.
+- MessageStream type.
+
 ## [v0.6.0] - 2022-01-19
 
 ### Added
@@ -64,10 +79,11 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Removed
 - Session.Listen API.
 
-[Unreleased]: https://github.com/strongswan/govici/compare/v0.6.0...HEAD
+[Unreleased]: https://github.com/strongswan/govici/compare/v0.7.0...HEAD
 [v0.4.0]: https://github.com/strongswan/govici/compare/v0.3.0...v0.4.0
 [v0.4.1]: https://github.com/strongswan/govici/compare/v0.4.0...v0.4.1
 [v0.5.0]: https://github.com/strongswan/govici/compare/v0.4.1...v0.5.0
 [v0.5.1]: https://github.com/strongswan/govici/compare/v0.5.0...v0.5.1
 [v0.5.2]: https://github.com/strongswan/govici/compare/v0.5.1...v0.5.2
 [v0.6.0]: https://github.com/strongswan/govici/compare/v0.5.2...v0.6.0
+[v0.7.0]: https://github.com/strongswan/govici/compare/v0.6.0...v0.7.0
