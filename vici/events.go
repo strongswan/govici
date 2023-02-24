@@ -40,6 +40,9 @@ type eventListener struct {
 
 	muChans sync.Mutex
 	chans   map[chan<- Event]struct{}
+
+	// Lazily start the listen loop on the first call to registerEvents.
+	listenOnce sync.Once
 }
 
 // Event represents an event received by a Session sent from the
@@ -64,8 +67,6 @@ func newEventListener(t *transport) *eventListener {
 		pc:        make(chan *packet, 4),
 		chans:     make(map[chan<- Event]struct{}),
 	}
-
-	go el.listen()
 
 	return el
 }
@@ -153,6 +154,8 @@ func (el *eventListener) dispatch(e Event) {
 }
 
 func (el *eventListener) registerEvents(events []string) error {
+	el.listenOnce.Do(func() { go el.listen() })
+
 	el.mu.Lock()
 	defer el.mu.Unlock()
 
