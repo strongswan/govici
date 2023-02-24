@@ -182,7 +182,11 @@ func main() {
 	name := "rw"
 
 	for {
-		e := <-ec
+		e, ok := <-ec
+		if !ok {
+			fmt.Println("Event listener closed")
+			return
+		}
 
 		// The Event.Name field corresponds to the event name
 		// we used to make the subscription. The Event.Message
@@ -203,7 +207,6 @@ func main() {
 		}
 	}
 }
-
 ```
 
 The `Session.NotifyEvents` function is used to register a channel to receive `Event`'s on. The channel will continue to receive events as long as the `Session` is subscribed to events, or until `Session.StopEvents` is called with the same channel. Event subscriptions and unsubscriptions can be made at any time while the `Session` is active.
