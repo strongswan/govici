@@ -239,6 +239,10 @@ func (s *Session) UnsubscribeAll() error {
 // NotifyEvents may be called multiple times with different channels: each
 // channel will indepedently receive a copy of each event received by the
 // Session.
+//
+// When the Session is Close()'d, or the event listener otherwise exits, e.g.
+// due to the daemon stopping or restarting, c will be closed to indicate
+// that no more events will be passed to it.
 func (s *Session) NotifyEvents(c chan<- Event) {
 	s.el.notify(c)
 }
