@@ -134,7 +134,7 @@ func main() {
                 return
         }
 
-        for _, m := range ms.Messages() {
+        for _, m := range ms {
                 if m.Err() != nil {
                         fmt.Println(err)
                         return
@@ -445,7 +445,7 @@ func initiate(ike, child string) error {
 		return err
 	}
 
-	for _, msg := range ms.Messages() {
+	for _, msg := range ms {
 		if err := msg.Err(); err != nil {
                         return err
 		}
