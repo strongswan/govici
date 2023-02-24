@@ -14,6 +14,8 @@ The package documentation can be found on [godoc](https://godoc.org/github.com/s
 
 This package makes an effort to not make breaking changes to the API, but while it is in early stages it may be necessary. The goal is to be able to guarantee API stability at `v1.0.0`. For details on changes to the API, please read the [changelog](CHANGELOG.md).
 
+When a new minor version is released, the previous minor version will still receive updates for bug fixes if needed, especially when the new minor version introduces breaking changes.
+
 ## Getting started
 
 ```go
