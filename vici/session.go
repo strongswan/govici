@@ -24,6 +24,8 @@ import (
 	"context"
 	"net"
 	"sync"
+	"syscall"
+	"time"
 )
 
 // Session is a vici client session.
@@ -113,6 +115,39 @@ func (s *Session) Close() error {
 	}
 
 	return nil
+}
+
+// SetDeadline sets deadline on read/write on the underlining connection
+func (s *Session) SetDeadline(t time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.ctr != nil && s.ctr.conn != nil {
+		return s.ctr.conn.SetDeadline(t)
+	}
+	return syscall.EINVAL
+}
+
+// SetReadDeadline sets read deadline on the underlining connection
+func (s *Session) SetReadDeadline(t time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.ctr != nil && s.ctr.conn != nil {
+		return s.ctr.conn.SetReadDeadline(t)
+	}
+	return syscall.EINVAL
+}
+
+// SetWriteDeadline sets write deadline on the underlining connection
+func (s *Session) SetWriteDeadline(t time.Time) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	if s.ctr != nil && s.ctr.conn != nil {
+		return s.ctr.conn.SetWriteDeadline(t)
+	}
+	return syscall.EINVAL
 }
 
 // SessionOption is used to specify additional options
