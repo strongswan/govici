@@ -22,6 +22,8 @@ package vici
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net"
 	"sync"
 )
@@ -34,8 +36,8 @@ type Session struct {
 	// transports: one is locked with mutex during use, e.g. command
 	// requests (including streamed requests), and the other is used
 	// for listening to registered events.
-	mu  sync.Mutex
-	ctr *transport
+	mu sync.Mutex
+	cc *clientConn
 
 	el *eventListener
 
@@ -60,14 +62,13 @@ func NewSession(opts ...SessionOption) (*Session, error) {
 		opt.apply(s.sessionOpts)
 	}
 
-	ctr, err := s.newTransport()
+	cc, err := s.newClientConn()
 	if err != nil {
 		return nil, err
 	}
+	s.cc = cc
 
-	s.ctr = ctr
-
-	elt, err := s.newTransport()
+	elt, err := s.newClientConn()
 	if err != nil {
 		return nil, err
 	}
@@ -77,11 +78,11 @@ func NewSession(opts ...SessionOption) (*Session, error) {
 	return s, nil
 }
 
-// newTransport creates a transport based on the session options.
-func (s *Session) newTransport() (*transport, error) {
+// newClientConn creates a clientConn based on the session options.
+func (s *Session) newClientConn() (*clientConn, error) {
 	// Check if a net.Conn was supplied already (testing only).
 	if s.conn != nil {
-		return &transport{conn: s.conn}, nil
+		return &clientConn{conn: s.conn}, nil
 	}
 
 	conn, err := s.dialer(context.Background(), s.network, s.addr)
@@ -89,11 +90,11 @@ func (s *Session) newTransport() (*transport, error) {
 		return nil, err
 	}
 
-	t := &transport{
+	cc := &clientConn{
 		conn: conn,
 	}
 
-	return t, nil
+	return cc, nil
 }
 
 // Close closes the vici session.
@@ -104,12 +105,12 @@ func (s *Session) Close() error {
 
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.ctr != nil {
-		if err := s.ctr.conn.Close(); err != nil {
+	if s.cc != nil {
+		if err := s.cc.conn.Close(); err != nil {
 			return err
 		}
 
-		s.ctr = nil
+		s.cc = nil
 	}
 
 	return nil
@@ -193,7 +194,13 @@ func withTestConn(conn net.Conn) SessionOption {
 // the command fails, the response Message is returned along with the error returned by
 // Message.Err.
 func (s *Session) CommandRequest(cmd string, msg *Message) (*Message, error) {
-	resp, err := s.sendRequest(cmd, msg)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cc == nil {
+		return nil, errors.New("session closed")
+	}
+
+	resp, err := s.request(context.Background(), cmd, msg)
 	if err != nil {
 		return nil, err
 	}
@@ -206,7 +213,13 @@ func (s *Session) CommandRequest(cmd string, msg *Message) (*Message, error) {
 // to stream while the command request is active. The complete stream of messages received from
 // the server is returned once the request is complete.
 func (s *Session) StreamedCommandRequest(cmd string, event string, msg *Message) ([]*Message, error) {
-	return s.sendStreamedRequest(cmd, event, msg)
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.cc == nil {
+		return nil, errors.New("session closed")
+	}
+
+	return s.streamedRequest(context.Background(), cmd, event, msg)
 }
 
 // Subscribe registers the session to listen for all events given. To receive
@@ -250,4 +263,84 @@ func (s *Session) NotifyEvents(c chan<- Event) {
 // StopEvents stops writing received events to c.
 func (s *Session) StopEvents(c chan<- Event) {
 	s.el.stop(c)
+}
+
+func (s *Session) request(ctx context.Context, cmd string, in *Message) (*Message, error) {
+	p := newPacket(pktCmdRequest, cmd, in)
+
+	if err := s.cc.packetWrite(ctx, p); err != nil {
+		return nil, err
+	}
+
+	p, err := s.cc.packetRead(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	if p.ptype != pktCmdResponse {
+		return nil, fmt.Errorf("%v: %v", errUnexpectedResponse, p.ptype)
+	}
+
+	return p.msg, nil
+}
+
+func (s *Session) streamedRequest(ctx context.Context, cmd string, event string, in *Message) ([]*Message, error) {
+	if err := s.eventRegister(ctx, event); err != nil {
+		return nil, err
+	}
+	// nolint
+	defer s.eventUnregister(ctx, event)
+
+	if err := s.cc.packetWrite(ctx, newPacket(pktCmdRequest, cmd, in)); err != nil {
+		return nil, err
+	}
+
+	messages := make([]*Message, 0)
+	for {
+		p, err := s.cc.packetRead(ctx)
+		if err != nil {
+			return nil, err
+		}
+
+		switch p.ptype {
+		case pktEvent:
+			messages = append(messages, p.msg)
+		case pktCmdResponse:
+			// End of event stream
+			messages = append(messages, p.msg)
+			return messages, nil
+		default:
+			return nil, fmt.Errorf("%v: %v", errUnexpectedResponse, p.ptype)
+		}
+	}
+}
+
+func (s *Session) eventRequest(ctx context.Context, ptype uint8, event string) error {
+	p := newPacket(ptype, event, nil)
+
+	if err := s.cc.packetWrite(ctx, p); err != nil {
+		return err
+	}
+
+	p, err := s.cc.packetRead(ctx)
+	if err != nil {
+		return err
+	}
+
+	switch p.ptype {
+	case pktEventConfirm:
+		return nil
+	case pktEventUnknown:
+		return fmt.Errorf("%v: %v", errEventUnknown, event)
+	default:
+		return fmt.Errorf("%v: %v", errUnexpectedResponse, p.ptype)
+	}
+}
+
+func (s *Session) eventRegister(ctx context.Context, event string) error {
+	return s.eventRequest(ctx, pktEventRegister, event)
+}
+
+func (s *Session) eventUnregister(ctx context.Context, event string) error {
+	return s.eventRequest(ctx, pktEventUnregister, event)
 }

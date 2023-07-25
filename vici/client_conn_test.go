@@ -22,18 +22,19 @@ package vici
 
 import (
 	"bytes"
+	"context"
 	"encoding/binary"
 	"net"
 	"reflect"
 	"testing"
 )
 
-func TestTransportSend(t *testing.T) {
+func TestPacketWrite(t *testing.T) {
 	client, srvr := net.Pipe()
 	defer client.Close()
 	defer srvr.Close()
 
-	tr := &transport{
+	cc := &clientConn{
 		conn: client,
 	}
 
@@ -70,7 +71,7 @@ func TestTransportSend(t *testing.T) {
 		}
 	}()
 
-	err := tr.send(goldNamedPacket)
+	err := cc.packetWrite(context.Background(), goldNamedPacket)
 	if err != nil {
 		t.Fatalf("Unexpected error sending packet: %v", err)
 	}
@@ -78,12 +79,12 @@ func TestTransportSend(t *testing.T) {
 	<-done
 }
 
-func TestTransportRecv(t *testing.T) {
+func TestPacketRead(t *testing.T) {
 	client, srvr := net.Pipe()
 	defer client.Close()
 	defer srvr.Close()
 
-	tr := &transport{
+	cc := &clientConn{
 		conn: client,
 	}
 
@@ -94,7 +95,7 @@ func TestTransportRecv(t *testing.T) {
 	go func() {
 		defer close(done)
 
-		p, err := tr.recv()
+		p, err := cc.packetRead(context.Background())
 		if err != nil {
 			t.Errorf("Unexpected error receiving packet: %v", err)
 		}

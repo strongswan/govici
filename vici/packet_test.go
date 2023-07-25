@@ -76,10 +76,10 @@ var (
 
 func TestPacketParse(t *testing.T) {
 	p := &packet{}
+	p.parse(goldNamedPacketBytes)
 
-	err := p.parse(goldNamedPacketBytes)
-	if err != nil {
-		t.Fatalf("Error parsing packet: %v", err)
+	if p.err != nil {
+		t.Fatalf("Error parsing packet: %v", p.err)
 	}
 
 	if !reflect.DeepEqual(p, goldNamedPacket) {
@@ -87,10 +87,10 @@ func TestPacketParse(t *testing.T) {
 	}
 
 	p = &packet{}
+	p.parse(goldUnnamedPacketBytes)
 
-	err = p.parse(goldUnnamedPacketBytes)
-	if err != nil {
-		t.Fatalf("Error parsing packet: %v", err)
+	if p.err != nil {
+		t.Fatalf("Error parsing packet: %v", p.err)
 	}
 
 	if !reflect.DeepEqual(p, goldUnnamedPacket) {

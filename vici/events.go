@@ -21,6 +21,7 @@
 package vici
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"sync"
@@ -28,7 +29,7 @@ import (
 )
 
 type eventListener struct {
-	*transport
+	cc *clientConn
 
 	// Lock events when registering and unregistering.
 	mu     sync.Mutex
@@ -61,11 +62,11 @@ type Event struct {
 	Timestamp time.Time
 }
 
-func newEventListener(t *transport) *eventListener {
+func newEventListener(cc *clientConn) *eventListener {
 	el := &eventListener{
-		transport: t,
-		pc:        make(chan *packet, 4),
-		chans:     make(map[chan<- Event]struct{}),
+		cc:    cc,
+		pc:    make(chan *packet, 4),
+		chans: make(map[chan<- Event]struct{}),
 	}
 
 	return el
@@ -80,7 +81,7 @@ func (el *eventListener) Close() error {
 		return err
 	}
 
-	el.conn.Close()
+	el.cc.conn.Close()
 
 	return nil
 }
@@ -92,7 +93,7 @@ func (el *eventListener) listen() {
 	defer el.closeAllChans()
 
 	for {
-		p, err := el.recv()
+		p, err := el.cc.packetRead(context.Background())
 		if err != nil {
 			return
 		}
@@ -177,7 +178,7 @@ func (el *eventListener) registerEvents(events []string) error {
 			continue
 		}
 
-		if err := el.eventRegisterUnregister(event, true); err != nil {
+		if err := el.register(event); err != nil {
 			return err
 		}
 
@@ -196,13 +197,13 @@ func (el *eventListener) unregisterEvents(events []string, all bool) error {
 		events = el.events
 	}
 
-	for _, e := range events {
-		if err := el.eventRegisterUnregister(e, false); err != nil {
+	for _, event := range events {
+		if err := el.unregister(event); err != nil {
 			return err
 		}
 
 		for i, registered := range el.events {
-			if e != registered {
+			if event != registered {
 				continue
 			}
 
@@ -217,38 +218,33 @@ func (el *eventListener) unregisterEvents(events []string, all bool) error {
 	return nil
 }
 
-func (el *eventListener) eventRegisterUnregister(event string, register bool) error {
-	ptype := pktEventRegister
-	if !register {
-		ptype = pktEventUnregister
-	}
+func (el *eventListener) eventRequest(ptype uint8, event string) error {
+	p := newPacket(ptype, event, nil)
 
-	p, err := el.eventTransportCommunicate(newPacket(ptype, event, nil))
-	if err != nil {
+	if err := el.cc.packetWrite(context.Background(), p); err != nil {
 		return err
 	}
 
-	if p.ptype == pktEventUnknown {
-		return fmt.Errorf("%v: %v", errEventUnknown, event)
-	}
-
-	if p.ptype != pktEventConfirm {
-		return fmt.Errorf("%v:%v", errUnexpectedResponse, p.ptype)
-	}
-
-	return nil
-}
-
-func (el *eventListener) eventTransportCommunicate(pkt *packet) (*packet, error) {
-	err := el.send(pkt)
-	if err != nil {
-		return nil, err
-	}
-
+	// The response packet is read by listen(), and written over pc.
 	p, ok := <-el.pc
 	if !ok {
-		return nil, io.ErrClosedPipe
+		return io.ErrClosedPipe
 	}
 
-	return p, nil
+	switch p.ptype {
+	case pktEventConfirm:
+		return nil
+	case pktEventUnknown:
+		return fmt.Errorf("%v: %v", errEventUnknown, event)
+	default:
+		return fmt.Errorf("%v: %v", errUnexpectedResponse, p.ptype)
+	}
+}
+
+func (el *eventListener) register(event string) error {
+	return el.eventRequest(pktEventRegister, event)
+}
+
+func (el *eventListener) unregister(event string) error {
+	return el.eventRequest(pktEventUnregister, event)
 }

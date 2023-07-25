@@ -69,6 +69,7 @@ type packet struct {
 	name  string
 
 	msg *Message
+	err error
 }
 
 func newPacket(ptype uint8, name string, msg *Message) *packet {
@@ -135,14 +136,16 @@ func (p *packet) bytes() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-// parse will parse the given bytes and populate its fields with that data
-func (p *packet) parse(data []byte) error {
+// parse will parse the given bytes and populate its fields with that data. If
+// there is an error, then the error filed will be set.
+func (p *packet) parse(data []byte) {
 	buf := bytes.NewBuffer(data)
 
 	// Read the packet type
 	b, err := buf.ReadByte()
 	if err != nil {
-		return fmt.Errorf("%v: %v", errPacketParse, err)
+		p.err = fmt.Errorf("%v: %v", errPacketParse, err)
+		return
 	}
 	p.ptype = b
 
@@ -150,13 +153,15 @@ func (p *packet) parse(data []byte) error {
 		// Get the length of the name
 		l, err := buf.ReadByte()
 		if err != nil {
-			return fmt.Errorf("%v: %v", errPacketParse, err)
+			p.err = fmt.Errorf("%v: %v", errPacketParse, err)
+			return
 		}
 
 		// Read the name
 		name := buf.Next(int(l))
 		if len(name) != int(l) {
-			return errBadName
+			p.err = errBadName
+			return
 		}
 		p.name = string(name)
 	}
@@ -165,9 +170,8 @@ func (p *packet) parse(data []byte) error {
 	m := NewMessage()
 	err = m.decode(buf.Bytes())
 	if err != nil {
-		return err
+		p.err = err
+		return
 	}
 	p.msg = m
-
-	return nil
 }
