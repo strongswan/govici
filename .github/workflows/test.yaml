@@ -21,4 +21,4 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
     - name: Test
-      run: sudo -E env "PATH=$PATH" TEST_FLAGS=-integration make test
+      run: sudo -E env "PATH=$PATH" go test -v ./vici -count=1 -integration
