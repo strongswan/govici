@@ -24,6 +24,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"iter"
 	"net"
 	"sync"
 )
@@ -193,14 +194,32 @@ func withTestConn(conn net.Conn) SessionOption {
 // error communicating with the daemon, a nil Message and non-nil error are returned. If
 // the command fails, the response Message is returned along with the error returned by
 // Message.Err.
+//
+// Deprecated: Use the Call method instead. CommandRequest will be removed in a future version.
 func (s *Session) CommandRequest(cmd string, msg *Message) (*Message, error) {
+	return s.Call(context.Background(), cmd, msg)
+}
+
+// Call makes a command request to the server, and returns the server's response.
+// The command is specified by cmd, and its arguments are provided by in. If there is an
+// error communicating with the daemon, a nil Message and non-nil error are returned. If
+// the command fails, the response Message is returned along with the error returned by
+// Message.Err.
+//
+// The provided context must be non-nil, and can be used to interrupt blocking network I/O
+// involved in the command request.
+func (s *Session) Call(ctx context.Context, cmd string, in *Message) (*Message, error) {
+	if ctx == nil {
+		return nil, errors.New("ctx cannot be nil")
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.cc == nil {
 		return nil, errors.New("session closed")
 	}
 
-	resp, err := s.request(context.Background(), cmd, msg)
+	resp, err := s.request(ctx, cmd, in)
 	if err != nil {
 		return nil, err
 	}
@@ -212,14 +231,90 @@ func (s *Session) CommandRequest(cmd string, msg *Message) (*Message, error) {
 // behaves like CommandRequest, but accepts an event argument, which specifies the event type
 // to stream while the command request is active. The complete stream of messages received from
 // the server is returned once the request is complete.
+//
+// Deprecated: Use the CallStreaming method instead. StreamedCommandRequest will be removed in
+// a future version.
 func (s *Session) StreamedCommandRequest(cmd string, event string, msg *Message) ([]*Message, error) {
+	resp, err := s.CallStreaming(context.Background(), cmd, event, msg)
+	if err != nil {
+		return nil, err
+	}
+
+	messages := make([]*Message, 0)
+
+	for m := range resp {
+		messages = append(messages, m)
+	}
+
+	return messages, nil
+}
+
+// CallStreaming makes a command request to the server which, involves streaming a given event type
+// until the command is complete. The command and event names are specified with cmd and event, and
+// the command arguments are provided by in. If there is an error during the initial command request
+// or event registration, no response messages are returned and a non-nil error is returned.
+//
+// When the initial command request and event registration are successful, an iterator is returned
+// which will yield response messages, and possibly errors, as they are received from the server.
+//
+// The provided context must be non-nil, and can be used to interrupt blocking network I/O
+// involved in the command request.
+func (s *Session) CallStreaming(ctx context.Context, cmd string, event string, in *Message) (seq iter.Seq2[*Message, error], err error) {
+	if ctx == nil {
+		return nil, errors.New("ctx cannot be nil")
+	}
+
 	s.mu.Lock()
-	defer s.mu.Unlock()
+	defer func() {
+		if err != nil {
+			s.mu.Unlock()
+		}
+	}()
+
 	if s.cc == nil {
 		return nil, errors.New("session closed")
 	}
 
-	return s.streamedRequest(context.Background(), cmd, event, msg)
+	if err := s.eventRegister(ctx, event); err != nil {
+		return nil, err
+	}
+	defer func() {
+		if err != nil {
+			// nolint
+			s.eventUnregister(ctx, event)
+		}
+	}()
+
+	if err := s.cc.packetWrite(ctx, newPacket(pktCmdRequest, cmd, in)); err != nil {
+		return nil, err
+	}
+
+	return func(yield func(*Message, error) bool) {
+		defer s.mu.Unlock()
+		// nolint
+		defer s.eventUnregister(ctx, event)
+
+		for {
+			p, err := s.cc.packetRead(ctx)
+			if err != nil {
+				yield(nil, err)
+				return
+			}
+
+			switch p.ptype {
+			case pktEvent:
+				if !yield(p.msg, p.msg.Err()) {
+					return
+				}
+			case pktCmdResponse:
+				yield(p.msg, p.msg.Err())
+				return // End of event stream
+			default:
+				yield(nil, fmt.Errorf("%v: %v", errUnexpectedResponse, p.ptype))
+				return
+			}
+		}
+	}, nil
 }
 
 // Subscribe registers the session to listen for all events given. To receive
@@ -282,37 +377,6 @@ func (s *Session) request(ctx context.Context, cmd string, in *Message) (*Messag
 	}
 
 	return p.msg, nil
-}
-
-func (s *Session) streamedRequest(ctx context.Context, cmd string, event string, in *Message) ([]*Message, error) {
-	if err := s.eventRegister(ctx, event); err != nil {
-		return nil, err
-	}
-	// nolint
-	defer s.eventUnregister(ctx, event)
-
-	if err := s.cc.packetWrite(ctx, newPacket(pktCmdRequest, cmd, in)); err != nil {
-		return nil, err
-	}
-
-	messages := make([]*Message, 0)
-	for {
-		p, err := s.cc.packetRead(ctx)
-		if err != nil {
-			return nil, err
-		}
-
-		switch p.ptype {
-		case pktEvent:
-			messages = append(messages, p.msg)
-		case pktCmdResponse:
-			// End of event stream
-			messages = append(messages, p.msg)
-			return messages, nil
-		default:
-			return nil, fmt.Errorf("%v: %v", errUnexpectedResponse, p.ptype)
-		}
-	}
 }
 
 func (s *Session) eventRequest(ctx context.Context, ptype uint8, event string) error {

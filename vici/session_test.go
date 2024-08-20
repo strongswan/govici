@@ -21,6 +21,7 @@
 package vici
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"net"
@@ -84,7 +85,7 @@ func TestCommandRequestAfterClose(t *testing.T) {
 // only meant to test the package API, and the specific commands used are out
 // of convenience; any command that satisfies the need of the test could be used.
 //
-// For example, TestStreamedCommandRequest uses the 'list-authorities' command, but
+// For example, TestCallStreaming uses the 'list-authorities' command, but
 // any event-streaming vici command could be used.
 //
 // These tests are only run when the -integration flag is set to true.
@@ -119,10 +120,10 @@ func TestCommandRequest(t *testing.T) {
 	}
 }
 
-// TestStreamedCommandRequest tests StreamedCommandRequest by calling the
+// TestCallStreaming tests CallStreaming by calling the
 // 'list-authorities' command. Likely, there will be no authorities returned,
 // but make sure any Messages that are streamed have non-nil err.
-func TestStreamedCommandRequest(t *testing.T) {
+func TestCallStreaming(t *testing.T) {
 	maybeSkipIntegrationTest(t)
 
 	s, err := NewSession()
@@ -131,14 +132,14 @@ func TestStreamedCommandRequest(t *testing.T) {
 	}
 	defer s.Close()
 
-	ms, err := s.StreamedCommandRequest("list-authorities", "list-authority", nil)
+	resp, err := s.CallStreaming(context.Background(), "list-authorities", "list-authority", nil)
 	if err != nil {
-		t.Fatalf("Failed to list authorities: %v", err)
+		t.Fatalf("Failed to make streaming call: %v", err)
 	}
 
-	for i, m := range ms {
-		if m.Err() != nil {
-			t.Fatalf("Got error in message #%d: %v", i+1, m.Err())
+	for _, err := range resp {
+		if err != nil {
+			t.Fatalf("Got error from CallStreaming: %v", err)
 		}
 	}
 }
