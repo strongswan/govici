@@ -93,10 +93,7 @@ func (cc *clientConn) awaitPacketWrite(p *packet) <-chan error {
 		}
 
 		// Write the packet length
-		pl := make([]byte, headerLength)
-		binary.BigEndian.PutUint32(pl, uint32(len(b)))
-		_, err = buf.Write(pl)
-		if err != nil {
+		if err := safePutUint32(buf, len(b)); err != nil {
 			r <- err
 			return
 		}

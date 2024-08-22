@@ -56,6 +56,7 @@ func TestPacketWrite(t *testing.T) {
 
 		length := binary.BigEndian.Uint32(b)
 
+		// #nosec G115
 		if want := len(goldNamedPacketBytes); length != uint32(want) {
 			t.Errorf("Unexpected packet length: got %d, expected: %d", length, want)
 		}
@@ -108,13 +109,17 @@ func TestPacketRead(t *testing.T) {
 	}()
 
 	// Make a buffer big enough for the data and the header.
-	b := make([]byte, headerLength+len(goldNamedPacketBytes))
+	buf := new(bytes.Buffer)
 
-	binary.BigEndian.PutUint32(b[:headerLength], uint32(len(goldNamedPacketBytes)))
+	if err := safePutUint32(buf, len(goldNamedPacketBytes)); err != nil {
+		t.Fatalf("Unexpected error writing header: %v", err)
+	}
 
-	copy(b[headerLength:], goldNamedPacketBytes)
+	if _, err := buf.Write(goldNamedPacketBytes); err != nil {
+		t.Fatalf("Unexpected error writing packet: %v", err)
+	}
 
-	_, err := srvr.Write(b)
+	_, err := srvr.Write(buf.Bytes())
 	if err != nil {
 		t.Fatalf("Unexpected error sending bytes: %v", err)
 	}

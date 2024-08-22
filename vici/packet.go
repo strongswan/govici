@@ -110,7 +110,7 @@ func (p *packet) bytes() ([]byte, error) {
 
 	// Write the name, preceded by its length
 	if p.isNamed() {
-		err := buf.WriteByte(uint8(len(p.name)))
+		err := safePutUint8(buf, len(p.name))
 		if err != nil {
 			return nil, fmt.Errorf("%v: %v", errPacketWrite, err)
 		}

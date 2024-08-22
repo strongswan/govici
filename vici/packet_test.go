@@ -117,3 +117,21 @@ func TestPacketBytes(t *testing.T) {
 		t.Fatalf("Encoded packet does not equal gold bytes.\nExpected: %v\nReceived: %v", goldUnnamedPacketBytes, b)
 	}
 }
+
+func TestPacketTooLong(t *testing.T) {
+	tooLong := make([]byte, 256)
+
+	for i := range tooLong {
+		tooLong[i] = 'a'
+	}
+
+	p := &packet{
+		ptype: pktCmdRequest,
+		name:  string(tooLong),
+	}
+
+	_, err := p.bytes()
+	if err == nil {
+		t.Fatalf("Expected packet-too-long error due to %s", p.name)
+	}
+}
