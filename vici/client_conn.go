@@ -25,6 +25,7 @@ import (
 	"context"
 	"encoding/binary"
 	"errors"
+	"fmt"
 	"io"
 	"net"
 	"time"
@@ -46,7 +47,7 @@ type clientConn struct {
 	conn net.Conn
 }
 
-func (cc *clientConn) packetWrite(ctx context.Context, p *packet) error {
+func (cc *clientConn) packetWrite(ctx context.Context, m *Message) error {
 	if err := cc.conn.SetWriteDeadline(time.Time{}); err != nil {
 		return err
 	}
@@ -55,7 +56,7 @@ func (cc *clientConn) packetWrite(ctx context.Context, p *packet) error {
 	case <-ctx.Done():
 		err := cc.conn.SetWriteDeadline(time.Now())
 		return errors.Join(err, ctx.Err())
-	case err := <-cc.awaitPacketWrite(p):
+	case err := <-cc.awaitPacketWrite(m):
 		if err != nil {
 			return err
 		}
@@ -63,7 +64,7 @@ func (cc *clientConn) packetWrite(ctx context.Context, p *packet) error {
 	}
 }
 
-func (cc *clientConn) packetRead(ctx context.Context) (*packet, error) {
+func (cc *clientConn) packetRead(ctx context.Context) (*Message, error) {
 	if err := cc.conn.SetReadDeadline(time.Time{}); err != nil {
 		return nil, err
 	}
@@ -72,21 +73,26 @@ func (cc *clientConn) packetRead(ctx context.Context) (*packet, error) {
 	case <-ctx.Done():
 		err := cc.conn.SetReadDeadline(time.Now())
 		return nil, errors.Join(err, ctx.Err())
-	case p := <-cc.awaitPacketRead():
-		if p.err != nil {
-			return nil, p.err
+	case v := <-cc.awaitPacketRead():
+		switch v.(type) {
+		case error:
+			return nil, v.(error)
+		case *Message:
+			return v.(*Message), nil
+		default:
+			// This is a programmer error.
+			return nil, fmt.Errorf("%v: invalid packet read", errEncoding)
 		}
-		return p, nil
 	}
 }
 
-func (cc *clientConn) awaitPacketWrite(p *packet) <-chan error {
+func (cc *clientConn) awaitPacketWrite(m *Message) <-chan error {
 	r := make(chan error, 1)
 	buf := bytes.NewBuffer([]byte{})
 
 	go func() {
 		defer close(r)
-		b, err := p.bytes()
+		b, err := m.encode()
 		if err != nil {
 			r <- err
 			return
@@ -111,18 +117,17 @@ func (cc *clientConn) awaitPacketWrite(p *packet) <-chan error {
 	return r
 }
 
-func (cc *clientConn) awaitPacketRead() <-chan *packet {
-	r := make(chan *packet, 1)
+func (cc *clientConn) awaitPacketRead() <-chan any {
+	r := make(chan any, 1)
 
 	go func() {
 		defer close(r)
-		p := &packet{}
+		m := NewMessage()
 
 		buf := make([]byte, headerLength)
 		_, err := io.ReadFull(cc.conn, buf)
 		if err != nil {
-			p.err = err
-			r <- p
+			r <- err
 			return
 		}
 		pl := binary.BigEndian.Uint32(buf)
@@ -130,13 +135,16 @@ func (cc *clientConn) awaitPacketRead() <-chan *packet {
 		buf = make([]byte, int(pl))
 		_, err = io.ReadFull(cc.conn, buf)
 		if err != nil {
-			p.err = err
-			r <- p
+			r <- err
 			return
 		}
 
-		p.parse(buf)
-		r <- p
+		if err := m.decode(buf); err != nil {
+			r <- err
+			return
+		}
+
+		r <- m
 	}()
 
 	return r

@@ -37,7 +37,7 @@ type eventListener struct {
 
 	// Packet channel used to communicate event registration
 	// results.
-	pc chan *packet
+	pc chan *Message
 
 	muChans sync.Mutex
 	chans   map[chan<- Event]struct{}
@@ -65,7 +65,7 @@ type Event struct {
 func newEventListener(cc *clientConn) *eventListener {
 	el := &eventListener{
 		cc:    cc,
-		pc:    make(chan *packet, 4),
+		pc:    make(chan *Message, 4),
 		chans: make(map[chan<- Event]struct{}),
 	}
 
@@ -93,18 +93,18 @@ func (el *eventListener) listen() {
 	defer el.closeAllChans()
 
 	for {
-		p, err := el.cc.packetRead(context.Background())
+		m, err := el.cc.packetRead(context.Background())
 		if err != nil {
 			return
 		}
 
 		ts := time.Now()
 
-		switch p.ptype {
+		switch m.header.ptype {
 		case pktEvent:
 			e := Event{
-				Name:      p.name,
-				Message:   p.msg,
+				Name:      m.header.name,
+				Message:   m,
 				Timestamp: ts,
 			}
 
@@ -114,7 +114,7 @@ func (el *eventListener) listen() {
 		// requests from the event listener. Forward them over
 		// the packet channel.
 		case pktEventConfirm, pktEventUnknown:
-			el.pc <- p
+			el.pc <- m
 		}
 	}
 }
@@ -219,25 +219,33 @@ func (el *eventListener) unregisterEvents(events []string, all bool) error {
 }
 
 func (el *eventListener) eventRequest(ptype uint8, event string) error {
-	p := newPacket(ptype, event, nil)
+	m := &Message{
+		header: &struct {
+			ptype uint8
+			name  string
+		}{
+			ptype: ptype,
+			name:  event,
+		},
+	}
 
-	if err := el.cc.packetWrite(context.Background(), p); err != nil {
+	if err := el.cc.packetWrite(context.Background(), m); err != nil {
 		return err
 	}
 
 	// The response packet is read by listen(), and written over pc.
-	p, ok := <-el.pc
+	m, ok := <-el.pc
 	if !ok {
 		return io.ErrClosedPipe
 	}
 
-	switch p.ptype {
+	switch m.header.ptype {
 	case pktEventConfirm:
 		return nil
 	case pktEventUnknown:
 		return fmt.Errorf("%v: %v", errEventUnknown, event)
 	default:
-		return fmt.Errorf("%v: %v", errUnexpectedResponse, p.ptype)
+		return fmt.Errorf("%v: %v", errUnexpectedResponse, m.header.ptype)
 	}
 }
 

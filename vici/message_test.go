@@ -29,8 +29,66 @@ import (
 )
 
 var (
+	goldNamedPacket = &Message{
+		header: &struct {
+			ptype uint8
+			name  string
+		}{
+			ptype: pktCmdRequest,
+			name:  "install",
+		},
+		keys: []string{"child", "ike"},
+		data: map[string]any{
+			"child": "test-CHILD_SA",
+			"ike":   "test-IKE_SA",
+		},
+	}
+
+	goldNamedPacketBytes = []byte{
+		// Packet type
+		0,
+		// Length of "install"
+		7,
+		// "install" in bytes
+		105, 110, 115, 116, 97, 108, 108,
+		// Encoded message bytes
+		3, 5, 99, 104, 105, 108, 100, 0, 13, 116, 101, 115, 116,
+		45, 67, 72, 73, 76, 68, 95, 83, 65, 3, 3, 105, 107, 101,
+		0, 11, 116, 101, 115, 116, 45, 73, 75, 69, 95, 83, 65,
+	}
+
+	goldUnnamedPacket = &Message{
+		header: &struct {
+			ptype uint8
+			name  string
+		}{
+			ptype: pktCmdResponse,
+		},
+		keys: []string{"success", "errmsg"},
+		data: map[string]any{
+			"success": "no",
+			"errmsg":  "failed to install CHILD_SA",
+		},
+	}
+
+	goldUnnamedPacketBytes = []byte{
+		// Packet type
+		1,
+		// Encoded message bytes
+		3, 7, 115, 117, 99, 99, 101, 115, 115, 0, 2, 110, 111, 3, 6,
+		101, 114, 114, 109, 115, 103, 0, 26, 102, 97, 105, 108, 101,
+		100, 32, 116, 111, 32, 105, 110, 115, 116, 97, 108, 108, 32,
+		67, 72, 73, 76, 68, 95, 83, 65,
+	}
+
 	// Gold message
 	goldMessage = &Message{
+		header: &struct {
+			ptype uint8
+			name  string
+		}{
+			ptype: pktCmdResponse,
+		},
 		keys: []string{"key1", "section1"},
 		data: map[string]any{
 			"key1": "value1",
@@ -53,6 +111,8 @@ var (
 
 	// Expected byte stream from encoding testMessage
 	goldMessageBytes = []byte{
+		// pktCmdResponse
+		1,
 		// key1 = value1
 		3, 4, 'k', 'e', 'y', '1', 0, 6, 'v', 'a', 'l', 'u', 'e', '1',
 		// section1
@@ -122,6 +182,71 @@ var (
 		},
 	}
 )
+
+func TestPacketParse(t *testing.T) {
+	m := NewMessage()
+
+	if err := m.decode(goldNamedPacketBytes); err != nil {
+		t.Fatalf("Error parsing packet: %v", err)
+	}
+
+	if !reflect.DeepEqual(m, goldNamedPacket) {
+		t.Fatalf("Parsed named packet does not equal gold packet.\nExpected: %v\nReceived: %v", goldNamedPacket, m)
+	}
+
+	m = NewMessage()
+
+	if err := m.decode(goldUnnamedPacketBytes); err != nil {
+		t.Fatalf("Error parsing packet: %v", err)
+	}
+
+	if !reflect.DeepEqual(m, goldUnnamedPacket) {
+		t.Fatalf("Parsed unnamed packet does not equal gold packet.\nExpected: %v\nReceived: %v", goldUnnamedPacket, m)
+	}
+}
+
+func TestPacketBytes(t *testing.T) {
+	b, err := goldNamedPacket.encode()
+	if err != nil {
+		t.Fatalf("Unexpected error getting packet bytes: %v", err)
+	}
+
+	if !bytes.Equal(b, goldNamedPacketBytes) {
+		t.Fatalf("Encoded packet does not equal gold bytes.\nExpected: %v\nReceived: %v", goldNamedPacketBytes, b)
+	}
+
+	b, err = goldUnnamedPacket.encode()
+	if err != nil {
+		t.Fatalf("Unexpected error getting packet bytes: %v", err)
+	}
+
+	if !bytes.Equal(b, goldUnnamedPacketBytes) {
+		t.Fatalf("Encoded packet does not equal gold bytes.\nExpected: %v\nReceived: %v", goldUnnamedPacketBytes, b)
+	}
+}
+
+func TestPacketTooLong(t *testing.T) {
+	tooLong := make([]byte, 256)
+
+	for i := range tooLong {
+		tooLong[i] = 'a'
+	}
+
+	m := &Message{
+		header: &struct {
+			ptype uint8
+			name  string
+		}{
+			ptype: pktCmdRequest,
+			name:  string(tooLong),
+		},
+	}
+
+	_, err := m.encode()
+	if err == nil {
+		t.Fatalf("Expected packet-too-long error due to %s", m.header.name)
+	}
+}
 
 type testMessage struct {
 	Key      string       `vici:"key"`

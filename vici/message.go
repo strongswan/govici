@@ -52,6 +52,32 @@ const (
 	msgListEnd
 )
 
+const (
+	// A name request message
+	pktCmdRequest uint8 = iota
+
+	// An unnamed response message for a request
+	pktCmdResponse
+
+	// An unnamed response if requested command is unknown
+	pktCmdUnkown
+
+	// A named event registration request
+	pktEventRegister
+
+	// A name event deregistration request
+	pktEventUnregister
+
+	// An unnamed response for successful event (de-)registration
+	pktEventConfirm
+
+	// An unnamed response if event (de-)registration failed
+	pktEventUnknown
+
+	// A named event message
+	pktEvent
+)
+
 var (
 	// Generic encoding/decoding and marshaling/unmarshaling errors
 	errEncoding  = errors.New("vici: error encoding message")
@@ -69,6 +95,7 @@ var (
 	errMalformedMessage = errors.New("vici: malformed message")
 
 	// Malformed message errors
+	errBadName           = fmt.Errorf("%v: expected name length does not match actual length", errDecoding)
 	errBadKey            = fmt.Errorf("%v: expected key length does not match actual length", errMalformedMessage)
 	errBadValue          = fmt.Errorf("%v: expected value length does not match actual length", errMalformedMessage)
 	errEndOfBuffer       = fmt.Errorf("%v: unexpected end of buffer", errMalformedMessage)
@@ -97,16 +124,21 @@ var (
 // for convenience, and may have rules on how they are converted to an appropriate internal message
 // element type. See Message.Set and MarshalMessage for details.
 type Message struct {
+	// Packet header. Set only for reading and writing message packets.
+	header *struct {
+		ptype uint8
+		name  string
+	}
 	keys []string
-
 	data map[string]any
 }
 
 // NewMessage returns an empty Message.
 func NewMessage() *Message {
 	return &Message{
-		keys: make([]string, 0),
-		data: make(map[string]any),
+		header: nil,
+		keys:   make([]string, 0),
+		data:   make(map[string]any),
 	}
 }
 
@@ -225,6 +257,33 @@ func (m *Message) Err() error {
 	return nil
 }
 
+// packetIsNamed returns a bool indicating the packet is a named type
+func (m *Message) packetIsNamed() bool {
+	if m.header == nil {
+		return false
+	}
+
+	switch m.header.ptype {
+	case /* Named packet types */
+		pktCmdRequest,
+		pktEventRegister,
+		pktEventUnregister,
+		pktEvent:
+
+		return true
+
+	case /* Un-named packet types */
+		pktCmdResponse,
+		pktCmdUnkown,
+		pktEventConfirm,
+		pktEventUnknown:
+
+		return false
+	}
+
+	return false
+}
+
 func (m *Message) addItem(key string, value any) error {
 	// Check if the key is already set in the message
 	_, exists := m.data[key]
@@ -317,6 +376,24 @@ func safePutUint32(buf *bytes.Buffer, val int) error {
 func (m *Message) encode() ([]byte, error) {
 	buf := bytes.NewBuffer([]byte{})
 
+	if m.header != nil {
+		if err := buf.WriteByte(m.header.ptype); err != nil {
+			return nil, fmt.Errorf("%v: %v", errEncoding, err)
+		}
+
+		if m.packetIsNamed() {
+			err := safePutUint8(buf, len(m.header.name))
+			if err != nil {
+				return nil, fmt.Errorf("%v: %v", errEncoding, err)
+			}
+
+			_, err = buf.WriteString(m.header.name)
+			if err != nil {
+				return nil, fmt.Errorf("%v: %v", errEncoding, err)
+			}
+		}
+	}
+
 	for k, v := range m.elements() {
 		rv := reflect.ValueOf(v)
 
@@ -369,14 +446,38 @@ func (m *Message) encode() ([]byte, error) {
 }
 
 func (m *Message) decode(data []byte) error {
+	m.header = &struct {
+		ptype uint8
+		name  string
+	}{}
 	buf := bytes.NewBuffer(data)
 
+	// Parse the message header first.
 	b, err := buf.ReadByte()
-	if err != nil && err != io.EOF {
+	if err != nil {
 		return fmt.Errorf("%v: %v", errDecoding, err)
+	}
+	m.header.ptype = b
+
+	if m.packetIsNamed() {
+		l, err := buf.ReadByte()
+		if err != nil {
+			return fmt.Errorf("%v: %v", errDecoding, err)
+		}
+
+		if name := buf.Next(int(l)); len(name) != int(l) {
+			return errBadName
+		} else {
+			m.header.name = string(name)
+		}
 	}
 
 	for buf.Len() > 0 {
+		b, err = buf.ReadByte()
+		if err != nil && err != io.EOF {
+			return fmt.Errorf("%v: %v", errDecoding, err)
+		}
+
 		// Determine the next message element
 		switch b {
 		case msgKeyValue:
@@ -399,11 +500,6 @@ func (m *Message) decode(data []byte) error {
 				return err
 			}
 			buf.Next(n)
-		}
-
-		b, err = buf.ReadByte()
-		if err != nil && err != io.EOF {
-			return fmt.Errorf("%v: %v", errDecoding, err)
 		}
 	}
 

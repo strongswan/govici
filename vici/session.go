@@ -209,22 +209,42 @@ func (s *Session) CommandRequest(cmd string, msg *Message) (*Message, error) {
 // The provided context must be non-nil, and can be used to interrupt blocking network I/O
 // involved in the command request.
 func (s *Session) Call(ctx context.Context, cmd string, in *Message) (*Message, error) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
 	if ctx == nil {
 		return nil, errors.New("ctx cannot be nil")
 	}
 
-	s.mu.Lock()
-	defer s.mu.Unlock()
 	if s.cc == nil {
 		return nil, errors.New("session closed")
 	}
 
-	resp, err := s.request(ctx, cmd, in)
+	if in == nil {
+		in = NewMessage()
+	}
+	in.header = &struct {
+		ptype uint8
+		name  string
+	}{
+		ptype: pktCmdRequest,
+		name:  cmd,
+	}
+
+	if err := s.cc.packetWrite(ctx, in); err != nil {
+		return nil, err
+	}
+
+	p, err := s.cc.packetRead(ctx)
 	if err != nil {
 		return nil, err
 	}
 
-	return resp, resp.Err()
+	if p.header.ptype != pktCmdResponse {
+		return nil, fmt.Errorf("%v: %v", errUnexpectedResponse, p.header.ptype)
+	}
+
+	return p, p.Err()
 }
 
 // StreamedCommandRequest sends a streamed command request to the server. StreamedCommandRequest
@@ -260,10 +280,6 @@ func (s *Session) StreamedCommandRequest(cmd string, event string, msg *Message)
 // The provided context must be non-nil, and can be used to interrupt blocking network I/O
 // involved in the command request.
 func (s *Session) CallStreaming(ctx context.Context, cmd string, event string, in *Message) (seq iter.Seq2[*Message, error], err error) {
-	if ctx == nil {
-		return nil, errors.New("ctx cannot be nil")
-	}
-
 	s.mu.Lock()
 	defer func() {
 		if err != nil {
@@ -271,8 +287,23 @@ func (s *Session) CallStreaming(ctx context.Context, cmd string, event string, i
 		}
 	}()
 
+	if ctx == nil {
+		return nil, errors.New("ctx cannot be nil")
+	}
+
 	if s.cc == nil {
 		return nil, errors.New("session closed")
+	}
+
+	if in == nil {
+		in = NewMessage()
+	}
+	in.header = &struct {
+		ptype uint8
+		name  string
+	}{
+		ptype: pktCmdRequest,
+		name:  cmd,
 	}
 
 	if err := s.eventRegister(ctx, event); err != nil {
@@ -285,7 +316,7 @@ func (s *Session) CallStreaming(ctx context.Context, cmd string, event string, i
 		}
 	}()
 
-	if err := s.cc.packetWrite(ctx, newPacket(pktCmdRequest, cmd, in)); err != nil {
+	if err := s.cc.packetWrite(ctx, in); err != nil {
 		return nil, err
 	}
 
@@ -301,16 +332,16 @@ func (s *Session) CallStreaming(ctx context.Context, cmd string, event string, i
 				return
 			}
 
-			switch p.ptype {
+			switch p.header.ptype {
 			case pktEvent:
-				if !yield(p.msg, p.msg.Err()) {
+				if !yield(p, p.Err()) {
 					return
 				}
 			case pktCmdResponse:
-				yield(p.msg, p.msg.Err())
+				yield(p, p.Err())
 				return // End of event stream
 			default:
-				yield(nil, fmt.Errorf("%v: %v", errUnexpectedResponse, p.ptype))
+				yield(nil, fmt.Errorf("%v: %v", errUnexpectedResponse, p.header.ptype))
 				return
 			}
 		}
@@ -360,27 +391,16 @@ func (s *Session) StopEvents(c chan<- Event) {
 	s.el.stop(c)
 }
 
-func (s *Session) request(ctx context.Context, cmd string, in *Message) (*Message, error) {
-	p := newPacket(pktCmdRequest, cmd, in)
-
-	if err := s.cc.packetWrite(ctx, p); err != nil {
-		return nil, err
-	}
-
-	p, err := s.cc.packetRead(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if p.ptype != pktCmdResponse {
-		return nil, fmt.Errorf("%v: %v", errUnexpectedResponse, p.ptype)
-	}
-
-	return p.msg, nil
-}
-
 func (s *Session) eventRequest(ctx context.Context, ptype uint8, event string) error {
-	p := newPacket(ptype, event, nil)
+	p := &Message{
+		header: &struct {
+			ptype uint8
+			name  string
+		}{
+			ptype: ptype,
+			name:  event,
+		},
+	}
 
 	if err := s.cc.packetWrite(ctx, p); err != nil {
 		return err
@@ -391,13 +411,13 @@ func (s *Session) eventRequest(ctx context.Context, ptype uint8, event string) e
 		return err
 	}
 
-	switch p.ptype {
+	switch p.header.ptype {
 	case pktEventConfirm:
 		return nil
 	case pktEventUnknown:
 		return fmt.Errorf("%v: %v", errEventUnknown, event)
 	default:
-		return fmt.Errorf("%v: %v", errUnexpectedResponse, p.ptype)
+		return fmt.Errorf("%v: %v", errUnexpectedResponse, p.header.ptype)
 	}
 }
 

@@ -32,8 +32,8 @@ func TestUnmarshalBoolTrue(t *testing.T) {
 	}
 
 	m := &Message{
-		[]string{"field"},
-		map[string]any{
+		keys: []string{"field"},
+		data: map[string]any{
 			"field": "yes",
 		},
 	}
@@ -56,8 +56,8 @@ func TestUnmarshalBoolFalse(t *testing.T) {
 	}
 
 	m := &Message{
-		[]string{"field"},
-		map[string]any{
+		keys: []string{"field"},
+		data: map[string]any{
 			"field": "no",
 		},
 	}
@@ -80,8 +80,8 @@ func TestUnmarshalBoolInvalid(t *testing.T) {
 	}
 
 	m := &Message{
-		[]string{"field"},
-		map[string]any{
+		keys: []string{"field"},
+		data: map[string]any{
 			"field": "invalid-not-a-bool",
 		},
 	}
@@ -100,8 +100,8 @@ func TestUnmarshalBoolTruePtr(t *testing.T) {
 	}
 
 	m := &Message{
-		[]string{"field"},
-		map[string]any{
+		keys: []string{"field"},
+		data: map[string]any{
 			"field": "yes",
 		},
 	}
@@ -128,8 +128,8 @@ func TestUnmarshalBoolFalsePtr(t *testing.T) {
 	}
 
 	m := &Message{
-		[]string{"field"},
-		map[string]any{
+		keys: []string{"field"},
+		data: map[string]any{
 			"field": "no",
 		},
 	}
@@ -156,8 +156,8 @@ func TestUnmarshalInt(t *testing.T) {
 	}
 
 	m := &Message{
-		[]string{"field"},
-		map[string]any{
+		keys: []string{"field"},
+		data: map[string]any{
 			"field": "23",
 		},
 	}
@@ -180,8 +180,8 @@ func TestUnmarshalInt2(t *testing.T) {
 	}
 
 	m := &Message{
-		[]string{"field"},
-		map[string]any{
+		keys: []string{"field"},
+		data: map[string]any{
 			"field": "-23",
 		},
 	}
@@ -204,8 +204,8 @@ func TestUnmarshalInt8(t *testing.T) {
 	}
 
 	m := &Message{
-		[]string{"field"},
-		map[string]any{
+		keys: []string{"field"},
+		data: map[string]any{
 			"field": "23",
 		},
 	}
@@ -228,8 +228,8 @@ func TestUnmarshalInt8Overflow(t *testing.T) {
 	}
 
 	m := &Message{
-		[]string{"field"},
-		map[string]any{
+		keys: []string{"field"},
+		data: map[string]any{
 			"field": "1001",
 		},
 	}
@@ -252,8 +252,8 @@ func TestUnmarshalUint(t *testing.T) {
 	}
 
 	m := &Message{
-		[]string{"field"},
-		map[string]any{
+		keys: []string{"field"},
+		data: map[string]any{
 			"field": "23",
 		},
 	}
@@ -276,8 +276,8 @@ func TestUnmarshalUintInvalid(t *testing.T) {
 	}
 
 	m := &Message{
-		[]string{"field"},
-		map[string]any{
+		keys: []string{"field"},
+		data: map[string]any{
 			"field": "-1",
 		},
 	}
@@ -297,8 +297,8 @@ func TestUnmarshalEnumType(t *testing.T) {
 	}{}
 
 	m := &Message{
-		[]string{"field"},
-		map[string]any{
+		keys: []string{"field"},
+		data: map[string]any{
 			"field": "test-value",
 		},
 	}
@@ -325,11 +325,11 @@ func TestUnmarshalEmbeddedStruct(t *testing.T) {
 	}{}
 
 	m := &Message{
-		[]string{"embedded"},
-		map[string]any{
+		keys: []string{"embedded"},
+		data: map[string]any{
 			"embedded": &Message{
-				[]string{"field"},
-				map[string]any{
+				keys: []string{"field"},
+				data: map[string]any{
 					"field": testValue,
 				},
 			},
@@ -358,8 +358,8 @@ func TestUnmarshalInline(t *testing.T) {
 	}{}
 
 	m := &Message{
-		[]string{"field"},
-		map[string]any{
+		keys: []string{"field"},
+		data: map[string]any{
 			"field": testValue,
 		},
 	}
@@ -380,8 +380,8 @@ func TestUnmarshalInlineInvalidType(t *testing.T) {
 	}{}
 
 	m := &Message{
-		[]string{"field"},
-		map[string]any{
+		keys: []string{"field"},
+		data: map[string]any{
 			"field": "test-value",
 		},
 	}
@@ -406,8 +406,8 @@ func TestUnmarshalInlineComposite(t *testing.T) {
 	}{}
 
 	m := &Message{
-		[]string{"field", "other"},
-		map[string]any{
+		keys: []string{"field", "other"},
+		data: map[string]any{
 			"field": testValue,
 			"other": otherValue,
 		},
