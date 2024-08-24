@@ -3,6 +3,13 @@ All notable changes to govici will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [Unreleased]
+
+### Changed
+
+- Re-factor transport into clientConn type that is context-aware.
+- Add safePutUint{8,16,32} helpers to avoid potential overflow bugs.
+
 ## [v0.7.0] - 2023-02-24
 
 ### Changed
