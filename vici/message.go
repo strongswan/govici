@@ -26,6 +26,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"iter"
 	"reflect"
 	"strconv"
 	"strings"
@@ -247,19 +248,18 @@ func (m *Message) addItem(key string, value any) error {
 	return nil
 }
 
-type messageElement struct {
-	k string
-	v any
-}
+func (m *Message) elements() iter.Seq2[string, any] {
+	return func(yield func(string, any) bool) {
+		if m.keys == nil || m.data == nil {
+			return
+		}
 
-func (m *Message) elements() []messageElement {
-	ordered := make([]messageElement, len(m.keys))
-
-	for i, k := range m.keys {
-		ordered[i] = messageElement{k: k, v: m.data[k]}
+		for _, k := range m.keys {
+			if !yield(k, m.data[k]) {
+				return
+			}
+		}
 	}
-
-	return ordered
 }
 
 func safePutUint8(buf *bytes.Buffer, val int) error {
@@ -317,10 +317,7 @@ func safePutUint32(buf *bytes.Buffer, val int) error {
 func (m *Message) encode() ([]byte, error) {
 	buf := bytes.NewBuffer([]byte{})
 
-	for _, e := range m.elements() {
-		k := e.k
-		v := e.v
-
+	for k, v := range m.elements() {
 		rv := reflect.ValueOf(v)
 
 		var (
@@ -515,9 +512,7 @@ func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
 	}
 
 	// Encode the sections elements
-	for _, e := range section.elements() {
-		k := e.k
-		v := e.v
+	for k, v := range section.elements() {
 
 		rv := reflect.ValueOf(v)
 
@@ -1018,9 +1013,9 @@ func (m *Message) unmarshalToMap(rv reflect.Value) error {
 		return fmt.Errorf("%v: map keys of type %v are not compatible with string", errUnmarshalTypeMismatch, rv.Type().Key().Kind())
 	}
 
-	for _, e := range m.elements() {
-		key := reflect.ValueOf(e.k)
-		val := reflect.ValueOf(e.v)
+	for k, v := range m.elements() {
+		key := reflect.ValueOf(k)
+		val := reflect.ValueOf(v)
 
 		rfv := rv.MapIndex(key)
 		mapElemType := rv.Type().Elem()
