@@ -86,13 +86,15 @@ func (s *Session) newClientConn() (*clientConn, error) {
 		return &clientConn{conn: s.conn}, nil
 	}
 
-	conn, err := s.dialer(context.Background(), s.network, s.addr)
-	if err != nil {
-		return nil, err
+	cc := &clientConn{
+		network: s.network,
+		addr:    s.addr,
+		dialer:  s.dialer,
+		conn:    nil,
 	}
 
-	cc := &clientConn{
-		conn: conn,
+	if err := cc.dial(context.Background()); err != nil {
+		return nil, err
 	}
 
 	return cc, nil
@@ -107,7 +109,7 @@ func (s *Session) Close() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if s.cc != nil {
-		if err := s.cc.conn.Close(); err != nil {
+		if err := s.cc.Close(); err != nil {
 			return err
 		}
 

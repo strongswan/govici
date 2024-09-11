@@ -81,7 +81,10 @@ func (el *eventListener) Close() error {
 		return err
 	}
 
-	el.cc.conn.Close()
+	if el.cc != nil {
+		el.cc.Close()
+		el.cc = nil
+	}
 
 	return nil
 }

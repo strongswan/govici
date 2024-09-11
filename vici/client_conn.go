@@ -28,7 +28,6 @@ import (
 	"fmt"
 	"io"
 	"net"
-	"time"
 )
 
 const (
@@ -44,19 +43,56 @@ var (
 )
 
 type clientConn struct {
-	conn net.Conn
+	network string
+	addr    string
+	dialer  func(ctx context.Context, network, addr string) (net.Conn, error)
+
+	closed bool
+	conn   net.Conn
 }
 
-func (cc *clientConn) packetWrite(ctx context.Context, m *Message) error {
-	if err := cc.conn.SetWriteDeadline(time.Time{}); err != nil {
+func (cc *clientConn) dial(ctx context.Context) error {
+	if !cc.closed && cc.conn != nil {
+		return nil
+	}
+
+	conn, err := cc.dialer(ctx, cc.network, cc.addr)
+	if err != nil {
 		return err
 	}
 
+	cc.conn = conn
+	cc.closed = false
+
+	return nil
+}
+
+func (cc *clientConn) Close() error {
+	if cc.closed || cc.conn == nil {
+		return nil
+	}
+
+	cc.closed = true
+
+	return cc.conn.Close()
+}
+
+func (cc *clientConn) packetWrite(ctx context.Context, m *Message) error {
+	if err := cc.dial(ctx); err != nil {
+		return err
+	}
+
+	rc := cc.asyncPacketWrite(m)
 	select {
 	case <-ctx.Done():
-		err := cc.conn.SetWriteDeadline(time.Now())
-		return errors.Join(err, ctx.Err())
-	case err := <-cc.awaitPacketWrite(m):
+		// Disconnect on context deadline to avoid data ordering
+		// problems with subsequent read/writes. Re-establish the
+		// connection later.
+		cc.Close()
+		<-rc
+
+		return ctx.Err()
+	case err := <-rc:
 		if err != nil {
 			return err
 		}
@@ -65,15 +101,21 @@ func (cc *clientConn) packetWrite(ctx context.Context, m *Message) error {
 }
 
 func (cc *clientConn) packetRead(ctx context.Context) (*Message, error) {
-	if err := cc.conn.SetReadDeadline(time.Time{}); err != nil {
+	if err := cc.dial(ctx); err != nil {
 		return nil, err
 	}
 
+	rc := cc.asyncPacketRead()
 	select {
 	case <-ctx.Done():
-		err := cc.conn.SetReadDeadline(time.Now())
-		return nil, errors.Join(err, ctx.Err())
-	case v := <-cc.awaitPacketRead():
+		// Disconnect on context deadline to avoid data ordering
+		// problems with subsequent read/writes. Re-establish the
+		// connection later.
+		cc.Close()
+		<-rc
+
+		return nil, ctx.Err()
+	case v := <-rc:
 		switch v.(type) {
 		case error:
 			return nil, v.(error)
@@ -86,7 +128,7 @@ func (cc *clientConn) packetRead(ctx context.Context) (*Message, error) {
 	}
 }
 
-func (cc *clientConn) awaitPacketWrite(m *Message) <-chan error {
+func (cc *clientConn) asyncPacketWrite(m *Message) <-chan error {
 	r := make(chan error, 1)
 	buf := bytes.NewBuffer([]byte{})
 
@@ -117,7 +159,7 @@ func (cc *clientConn) awaitPacketWrite(m *Message) <-chan error {
 	return r
 }
 
-func (cc *clientConn) awaitPacketRead() <-chan any {
+func (cc *clientConn) asyncPacketRead() <-chan any {
 	r := make(chan any, 1)
 
 	go func() {

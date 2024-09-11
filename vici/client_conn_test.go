@@ -127,7 +127,7 @@ func TestPacketRead(t *testing.T) {
 	<-done
 }
 
-func TestPacketWriteContext(t *testing.T) {
+func TestPacketWriteContextCancel(t *testing.T) {
 	client, srvr := net.Pipe()
 	defer client.Close()
 	defer srvr.Close()
@@ -143,17 +143,27 @@ func TestPacketWriteContext(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("Expected cancel on packet write, but got %v", err)
 	}
+}
 
-	ctx, cancel = context.WithTimeout(context.Background(), 3*time.Second)
+func TestPacketWriteContextTimeout(t *testing.T) {
+	client, srvr := net.Pipe()
+	defer client.Close()
+	defer srvr.Close()
+
+	cc := &clientConn{
+		conn: client,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	err = cc.packetWrite(ctx, goldNamedPacket)
+	err := cc.packetWrite(ctx, goldNamedPacket)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("Expected timeout on packet write, but got %v", err)
 	}
 }
 
-func TestPacketReadContext(t *testing.T) {
+func TestPacketReadContextCancel(t *testing.T) {
 	client, srvr := net.Pipe()
 	defer client.Close()
 	defer srvr.Close()
@@ -169,11 +179,21 @@ func TestPacketReadContext(t *testing.T) {
 	if !errors.Is(err, context.Canceled) {
 		t.Fatalf("Expected cancel on packet read, but got %v", err)
 	}
+}
 
-	ctx, cancel = context.WithTimeout(context.Background(), 3*time.Second)
+func TestPacketReadContextTimeout(t *testing.T) {
+	client, srvr := net.Pipe()
+	defer client.Close()
+	defer srvr.Close()
+
+	cc := &clientConn{
+		conn: client,
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
 	defer cancel()
 
-	_, err = cc.packetRead(ctx)
+	_, err := cc.packetRead(ctx)
 	if !errors.Is(err, context.DeadlineExceeded) {
 		t.Fatalf("Expected timeout on packet read, but got %v", err)
 	}
