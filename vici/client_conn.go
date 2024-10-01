@@ -116,11 +116,11 @@ func (cc *clientConn) packetRead(ctx context.Context) (*Message, error) {
 
 		return nil, ctx.Err()
 	case v := <-rc:
-		switch v.(type) {
+		switch v := v.(type) {
 		case error:
-			return nil, v.(error)
+			return nil, v
 		case *Message:
-			return v.(*Message), nil
+			return v, nil
 		default:
 			// This is a programmer error.
 			return nil, fmt.Errorf("%v: invalid packet read", errEncoding)

@@ -465,11 +465,12 @@ func (m *Message) decode(data []byte) error {
 			return fmt.Errorf("%v: %v", errDecoding, err)
 		}
 
-		if name := buf.Next(int(l)); len(name) != int(l) {
+		name := buf.Next(int(l))
+		if len(name) != int(l) {
 			return errBadName
-		} else {
-			m.header.name = string(name)
 		}
+
+		m.header.name = string(name)
 	}
 
 	for buf.Len() > 0 {
@@ -609,7 +610,6 @@ func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
 
 	// Encode the sections elements
 	for k, v := range section.elements() {
-
 		rv := reflect.ValueOf(v)
 
 		var data []byte
