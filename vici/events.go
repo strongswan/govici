@@ -74,13 +74,6 @@ func newEventListener(cc *clientConn) *eventListener {
 
 // Close closes the event channel.
 func (el *eventListener) Close() error {
-	// This call interacts with charon, so get it
-	// done first. Then, we can stop the listen
-	// goroutine.
-	if err := el.unregisterEvents(nil, true); err != nil {
-		return err
-	}
-
 	if el.cc != nil {
 		el.cc.Close()
 		el.cc = nil
