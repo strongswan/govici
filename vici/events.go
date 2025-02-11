@@ -22,6 +22,7 @@ package vici
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"sync"
@@ -223,6 +224,10 @@ func (el *eventListener) eventRequest(ptype uint8, event string) error {
 			ptype: ptype,
 			name:  event,
 		},
+	}
+
+	if el.cc == nil {
+		return errors.New("session closed")
 	}
 
 	if err := el.cc.packetWrite(context.Background(), m); err != nil {
