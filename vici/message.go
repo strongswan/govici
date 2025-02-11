@@ -257,6 +257,30 @@ func (m *Message) Err() error {
 	return nil
 }
 
+func (m *Message) stringIndent(prefix, indent string) string {
+	var str string
+
+	for k, v := range m.elements() {
+		switch v := v.(type) {
+		case string:
+			str += fmt.Sprintf("%s%s%s = %s\n", prefix, indent, k, v)
+		case []string:
+			str += fmt.Sprintf("%s%s%s = %s\n", prefix, indent, k, strings.Join(v, ","))
+		case *Message:
+			str += fmt.Sprintf("%s%s%s %s", prefix, indent, k, v.stringIndent(prefix+indent, indent))
+		}
+	}
+	str = fmt.Sprintf("{\n%s%s}\n", str, prefix)
+
+	return str
+}
+
+// String returns the string form of m. For readability, the output format is similar to
+// swanctl.conf configuration format.
+func (m *Message) String() string {
+	return m.stringIndent("", "  ")
+}
+
 // packetIsNamed returns a bool indicating the packet is a named type
 func (m *Message) packetIsNamed() bool {
 	if m.header == nil {

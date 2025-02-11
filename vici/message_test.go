@@ -333,16 +333,27 @@ func ExampleMarshalMessage() {
 		return
 	}
 
-	fmt.Println(m.Get("proposals"))
-
-	net := m.Get("children").(*Message).Get("net").(*Message)
-	for _, k := range net.Keys() {
-		fmt.Printf("%s: %s\n", k, net.Get(k))
-	}
-	// Output: [aes128-sha256-x25519]
-	// local_ts: [10.1.0.0/16]
-	// updown: /usr/local/libexec/ipsec/_updown iptables
-	// esp_proposals: [aes128gcm128-x25519]
+	fmt.Println(m)
+	// Output: {
+	//   local_addrs = 192.168.0.1
+	//   local {
+	//     auth = pubkey
+	//     certs = moonCert.pem
+	//     id = moon.strongswan.org
+	//   }
+	//   remote {
+	//     auth = pubkey
+	//   }
+	//   children {
+	//     net {
+	//       local_ts = 10.1.0.0/16
+	//       updown = /usr/local/libexec/ipsec/_updown iptables
+	//       esp_proposals = aes128gcm128-x25519
+	//     }
+	//   }
+	//   version = 2
+	//   proposals = aes128-sha256-x25519
+	// }
 }
 
 func ExampleUnmarshalMessage() {
@@ -737,8 +748,12 @@ func ExampleMessage_Set() {
 		return
 	}
 
-	fmt.Printf("%v, %v, %v\n", m.Get("version"), m.Get("mobike"), m.Get("local_addrs"))
-	// Output: 2, no, [192.168.0.1/24]
+	fmt.Println(m)
+	// Output: {
+	//   version = 2
+	//   mobike = no
+	//   local_addrs = 192.168.0.1/24
+	// }
 }
 
 func TestEmptyMessageElement(t *testing.T) {
