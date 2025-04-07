@@ -38,7 +38,7 @@ type Session struct {
 	// requests (including streamed requests), and the other is used
 	// for listening to registered events.
 	mu sync.Mutex
-	cc *clientConn
+	cc *clientConn1
 
 	el *eventListener
 
@@ -80,13 +80,13 @@ func NewSession(opts ...SessionOption) (*Session, error) {
 }
 
 // newClientConn creates a clientConn based on the session options.
-func (s *Session) newClientConn() (*clientConn, error) {
+func (s *Session) newClientConn() (*clientConn1, error) {
 	// Check if a net.Conn was supplied already (testing only).
 	if s.conn != nil {
-		return &clientConn{conn: s.conn}, nil
+		return &clientConn1{conn: s.conn}, nil
 	}
 
-	cc := &clientConn{
+	cc := &clientConn1{
 		network: s.network,
 		addr:    s.addr,
 		dialer:  s.dialer,

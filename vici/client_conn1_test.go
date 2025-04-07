@@ -36,7 +36,7 @@ func TestPacketWrite(t *testing.T) {
 	defer client.Close()
 	defer srvr.Close()
 
-	cc := &clientConn{
+	cc := &clientConn1{
 		conn: client,
 	}
 
@@ -87,7 +87,7 @@ func TestPacketRead(t *testing.T) {
 	defer client.Close()
 	defer srvr.Close()
 
-	cc := &clientConn{
+	cc := &clientConn1{
 		conn: client,
 	}
 
@@ -132,7 +132,7 @@ func TestPacketWriteContextCancel(t *testing.T) {
 	defer client.Close()
 	defer srvr.Close()
 
-	cc := &clientConn{
+	cc := &clientConn1{
 		conn: client,
 	}
 
@@ -150,7 +150,7 @@ func TestPacketWriteContextTimeout(t *testing.T) {
 	defer client.Close()
 	defer srvr.Close()
 
-	cc := &clientConn{
+	cc := &clientConn1{
 		conn: client,
 	}
 
@@ -168,7 +168,7 @@ func TestPacketReadContextCancel(t *testing.T) {
 	defer client.Close()
 	defer srvr.Close()
 
-	cc := &clientConn{
+	cc := &clientConn1{
 		conn: client,
 	}
 
@@ -186,7 +186,7 @@ func TestPacketReadContextTimeout(t *testing.T) {
 	defer client.Close()
 	defer srvr.Close()
 
-	cc := &clientConn{
+	cc := &clientConn1{
 		conn: client,
 	}
 

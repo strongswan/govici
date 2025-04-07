@@ -42,7 +42,7 @@ var (
 	errEventUnknown = errors.New("vici: unknown event type")
 )
 
-type clientConn struct {
+type clientConn1 struct {
 	network string
 	addr    string
 	dialer  func(ctx context.Context, network, addr string) (net.Conn, error)
@@ -51,7 +51,7 @@ type clientConn struct {
 	conn   net.Conn
 }
 
-func (cc *clientConn) dial(ctx context.Context) error {
+func (cc *clientConn1) dial(ctx context.Context) error {
 	if !cc.closed && cc.conn != nil {
 		return nil
 	}
@@ -67,7 +67,7 @@ func (cc *clientConn) dial(ctx context.Context) error {
 	return nil
 }
 
-func (cc *clientConn) Close() error {
+func (cc *clientConn1) Close() error {
 	if cc.closed || cc.conn == nil {
 		return nil
 	}
@@ -77,7 +77,7 @@ func (cc *clientConn) Close() error {
 	return cc.conn.Close()
 }
 
-func (cc *clientConn) packetWrite(ctx context.Context, m *Message) error {
+func (cc *clientConn1) packetWrite(ctx context.Context, m *Message) error {
 	if err := cc.dial(ctx); err != nil {
 		return err
 	}
@@ -100,7 +100,7 @@ func (cc *clientConn) packetWrite(ctx context.Context, m *Message) error {
 	}
 }
 
-func (cc *clientConn) packetRead(ctx context.Context) (*Message, error) {
+func (cc *clientConn1) packetRead(ctx context.Context) (*Message, error) {
 	if err := cc.dial(ctx); err != nil {
 		return nil, err
 	}
@@ -128,7 +128,7 @@ func (cc *clientConn) packetRead(ctx context.Context) (*Message, error) {
 	}
 }
 
-func (cc *clientConn) asyncPacketWrite(m *Message) <-chan error {
+func (cc *clientConn1) asyncPacketWrite(m *Message) <-chan error {
 	r := make(chan error, 1)
 	buf := bytes.NewBuffer([]byte{})
 
@@ -159,7 +159,7 @@ func (cc *clientConn) asyncPacketWrite(m *Message) <-chan error {
 	return r
 }
 
-func (cc *clientConn) asyncPacketRead() <-chan any {
+func (cc *clientConn1) asyncPacketRead() <-chan any {
 	r := make(chan any, 1)
 
 	go func() {

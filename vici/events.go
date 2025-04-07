@@ -30,7 +30,7 @@ import (
 )
 
 type eventListener struct {
-	cc *clientConn
+	cc *clientConn1
 
 	// Lock events when registering and unregistering.
 	mu     sync.Mutex
@@ -63,7 +63,7 @@ type Event struct {
 	Timestamp time.Time
 }
 
-func newEventListener(cc *clientConn) *eventListener {
+func newEventListener(cc *clientConn1) *eventListener {
 	el := &eventListener{
 		cc:    cc,
 		pc:    make(chan *Message, 4),
