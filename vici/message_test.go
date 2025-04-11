@@ -33,6 +33,7 @@ var (
 		header: &struct {
 			ptype uint8
 			name  string
+			seq   uint64
 		}{
 			ptype: pktCmdRequest,
 			name:  "install",
@@ -61,6 +62,7 @@ var (
 		header: &struct {
 			ptype uint8
 			name  string
+			seq   uint64
 		}{
 			ptype: pktCmdResponse,
 		},
@@ -86,6 +88,7 @@ var (
 		header: &struct {
 			ptype uint8
 			name  string
+			seq   uint64
 		}{
 			ptype: pktCmdResponse,
 		},
@@ -236,6 +239,7 @@ func TestPacketTooLong(t *testing.T) {
 		header: &struct {
 			ptype uint8
 			name  string
+			seq   uint64
 		}{
 			ptype: pktCmdRequest,
 			name:  string(tooLong),

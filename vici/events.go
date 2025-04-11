@@ -220,6 +220,7 @@ func (el *eventListener) eventRequest(ptype uint8, event string) error {
 		header: &struct {
 			ptype uint8
 			name  string
+			seq   uint64
 		}{
 			ptype: ptype,
 			name:  event,

@@ -228,6 +228,7 @@ func (s *Session) Call(ctx context.Context, cmd string, in *Message) (*Message, 
 	in.header = &struct {
 		ptype uint8
 		name  string
+		seq   uint64
 	}{
 		ptype: pktCmdRequest,
 		name:  cmd,
@@ -303,6 +304,7 @@ func (s *Session) CallStreaming(ctx context.Context, cmd string, event string, i
 	in.header = &struct {
 		ptype uint8
 		name  string
+		seq   uint64
 	}{
 		ptype: pktCmdRequest,
 		name:  cmd,
@@ -398,6 +400,7 @@ func (s *Session) eventRequest(ctx context.Context, ptype uint8, event string) e
 		header: &struct {
 			ptype uint8
 			name  string
+			seq   uint64
 		}{
 			ptype: ptype,
 			name:  event,

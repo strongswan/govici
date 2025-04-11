@@ -128,6 +128,7 @@ type Message struct {
 	header *struct {
 		ptype uint8
 		name  string
+		seq   uint64
 	}
 	keys []string
 	data map[string]any
@@ -473,6 +474,7 @@ func (m *Message) decode(data []byte) error {
 	m.header = &struct {
 		ptype uint8
 		name  string
+		seq   uint64
 	}{}
 	buf := bytes.NewBuffer(data)
 
