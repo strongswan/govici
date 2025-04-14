@@ -30,11 +30,7 @@ import (
 
 var (
 	goldNamedPacket = &Message{
-		header: &struct {
-			ptype uint8
-			name  string
-			seq   uint64
-		}{
+		header: &header{
 			ptype: pktCmdRequest,
 			name:  "install",
 		},
@@ -59,11 +55,7 @@ var (
 	}
 
 	goldUnnamedPacket = &Message{
-		header: &struct {
-			ptype uint8
-			name  string
-			seq   uint64
-		}{
+		header: &header{
 			ptype: pktCmdResponse,
 		},
 		keys: []string{"success", "errmsg"},
@@ -85,11 +77,7 @@ var (
 
 	// Gold message
 	goldMessage = &Message{
-		header: &struct {
-			ptype uint8
-			name  string
-			seq   uint64
-		}{
+		header: &header{
 			ptype: pktCmdResponse,
 		},
 		keys: []string{"key1", "section1"},
@@ -236,11 +224,7 @@ func TestPacketTooLong(t *testing.T) {
 	}
 
 	m := &Message{
-		header: &struct {
-			ptype uint8
-			name  string
-			seq   uint64
-		}{
+		header: &header{
 			ptype: pktCmdRequest,
 			name:  string(tooLong),
 		},

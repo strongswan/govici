@@ -225,11 +225,7 @@ func (s *Session) Call(ctx context.Context, cmd string, in *Message) (*Message, 
 	if in == nil {
 		in = NewMessage()
 	}
-	in.header = &struct {
-		ptype uint8
-		name  string
-		seq   uint64
-	}{
+	in.header = &header{
 		ptype: pktCmdRequest,
 		name:  cmd,
 	}
@@ -301,11 +297,7 @@ func (s *Session) CallStreaming(ctx context.Context, cmd string, event string, i
 	if in == nil {
 		in = NewMessage()
 	}
-	in.header = &struct {
-		ptype uint8
-		name  string
-		seq   uint64
-	}{
+	in.header = &header{
 		ptype: pktCmdRequest,
 		name:  cmd,
 	}
@@ -397,11 +389,7 @@ func (s *Session) StopEvents(c chan<- Event) {
 
 func (s *Session) eventRequest(ctx context.Context, ptype uint8, event string) error {
 	p := &Message{
-		header: &struct {
-			ptype uint8
-			name  string
-			seq   uint64
-		}{
+		header: &header{
 			ptype: ptype,
 			name:  event,
 		},

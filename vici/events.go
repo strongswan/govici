@@ -217,11 +217,7 @@ func (el *eventListener) unregisterEvents(events []string, all bool) error {
 
 func (el *eventListener) eventRequest(ptype uint8, event string) error {
 	m := &Message{
-		header: &struct {
-			ptype uint8
-			name  string
-			seq   uint64
-		}{
+		header: &header{
 			ptype: ptype,
 			name:  event,
 		},

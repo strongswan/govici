@@ -125,13 +125,16 @@ var (
 // element type. See Message.Set and MarshalMessage for details.
 type Message struct {
 	// Packet header. Set only for reading and writing message packets.
-	header *struct {
-		ptype uint8
-		name  string
-		seq   uint64
-	}
+	header *header
+
 	keys []string
 	data map[string]any
+}
+
+type header struct {
+	ptype uint8
+	name  string
+	seq   uint64
 }
 
 // NewMessage returns an empty Message.
@@ -471,11 +474,7 @@ func (m *Message) encode() ([]byte, error) {
 }
 
 func (m *Message) decode(data []byte) error {
-	m.header = &struct {
-		ptype uint8
-		name  string
-		seq   uint64
-	}{}
+	m.header = &header{}
 	buf := bytes.NewBuffer(data)
 
 	// Parse the message header first.
