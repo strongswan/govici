@@ -254,7 +254,7 @@ func (m *Message) Keys() []string {
 func (m *Message) Err() error {
 	if success, ok := m.data["success"]; ok {
 		if success != "yes" {
-			return fmt.Errorf("%v: %v", errCommandFailed, m.data["errmsg"])
+			return fmt.Errorf("%w: %v", errCommandFailed, m.data["errmsg"])
 		}
 	}
 
