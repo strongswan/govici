@@ -283,10 +283,20 @@ func ExampleMarshalMessage() {
 		ESPProposals          []string `vici:"esp_proposals"`
 	}
 
+	type local struct {
+		Auth  string   `vici:"auth"`
+		Certs []string `vici:"certs"`
+		ID    string   `vici:"id"`
+	}
+
+	type remote struct {
+		Auth string `vici:"auth"`
+	}
+
 	type conn struct {
 		LocalAddrs   []string         `vici:"local_addrs"`
-		Local        map[string]any   `vici:"local"`
-		Remote       map[string]any   `vici:"remote"`
+		Local        local            `vici:"local"`
+		Remote       remote           `vici:"remote"`
 		Children     map[string]child `vici:"children"`
 		IKEVersion   uint             `vici:"version"`
 		IKEProposals []string         `vici:"proposals"`
@@ -296,13 +306,13 @@ func ExampleMarshalMessage() {
 	// https://www.strongswan.org/testing/testresults/swanctl/rw-cert/moon.swanctl.conf
 	rw := &conn{
 		LocalAddrs: []string{"192.168.0.1"},
-		Local: map[string]any{
-			"auth":  "pubkey",
-			"certs": []string{"moonCert.pem"},
-			"id":    "moon.strongswan.org",
+		Local: local{
+			Auth:  "pubkey",
+			Certs: []string{"moonCert.pem"},
+			ID:    "moon.strongswan.org",
 		},
-		Remote: map[string]any{
-			"auth": "pubkey",
+		Remote: remote{
+			Auth: "pubkey",
 		},
 		Children: map[string]child{
 			"net": {
