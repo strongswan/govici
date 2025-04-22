@@ -4,7 +4,7 @@ jobs:
   test:
     strategy:
       matrix:
-        go-version: [1.23.x]
+        go-version: [1.24.x]
         os: [ubuntu-latest]
     runs-on: ${{ matrix.os }}
     steps:
@@ -21,4 +21,4 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v2
     - name: Test
-      run: sudo -E env "PATH=$PATH" go test -v ./vici -count=1 -integration
+      run: sudo -E env "PATH=$PATH" "GOEXPERIMENT=synctest" go test -v ./vici -count=1 -integration
