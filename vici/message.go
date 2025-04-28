@@ -76,6 +76,9 @@ const (
 
 	// A named event message
 	pktEvent
+
+	// Used to indicate boundary of valid packet types
+	pktInvalid
 )
 
 var (
@@ -310,6 +313,41 @@ func (m *Message) packetIsNamed() bool {
 	}
 
 	return false
+}
+
+// packetIsValid checks a packet header to make sure it is valid
+func (m *Message) packetIsValid() bool {
+	if m.header == nil {
+		return false
+	}
+
+	if m.header.ptype >= pktInvalid {
+		return false
+	}
+
+	if m.packetIsNamed() && m.header.name == "" {
+		return false
+	}
+
+	return true
+}
+
+func (m *Message) packetIsRequest() bool {
+	if m.header == nil {
+		return false
+	}
+
+	switch m.header.ptype {
+	case /* Valid client requests */
+		pktCmdRequest,
+		pktEventRegister,
+		pktEventUnregister:
+
+		return true
+
+	default:
+		return false
+	}
 }
 
 func (m *Message) addItem(key string, value any) error {
