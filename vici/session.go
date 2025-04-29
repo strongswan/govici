@@ -22,110 +22,15 @@ package vici
 
 import (
 	"context"
-	"errors"
-	"fmt"
 	"iter"
 	"net"
-	"sync"
+	"time"
 )
 
 // Session is a vici client session.
 type Session struct {
-	// Only one command can be active on the transport at a time,
-	// but events may get raised at any time while registered, even
-	// during an active command request command. So, give session two
-	// transports: one is locked with mutex during use, e.g. command
-	// requests (including streamed requests), and the other is used
-	// for listening to registered events.
-	mu sync.Mutex
-	cc *clientConn1
+	cc *clientConn
 
-	el *eventListener
-
-	// Session options.
-	*sessionOpts
-}
-
-// NewSession returns a new vici session.
-func NewSession(opts ...SessionOption) (*Session, error) {
-	s := &Session{
-		// Set default session opts before applying
-		// the opts passed by the caller.
-		sessionOpts: &sessionOpts{
-			network: sessionDefaultNetwork,
-			addr:    sessionDefaultAddr,
-			dialer:  (&net.Dialer{}).DialContext,
-			conn:    nil,
-		},
-	}
-
-	for _, opt := range opts {
-		opt.apply(s.sessionOpts)
-	}
-
-	cc, err := s.newClientConn()
-	if err != nil {
-		return nil, err
-	}
-	s.cc = cc
-
-	elt, err := s.newClientConn()
-	if err != nil {
-		return nil, err
-	}
-
-	s.el = newEventListener(elt)
-
-	return s, nil
-}
-
-// newClientConn creates a clientConn based on the session options.
-func (s *Session) newClientConn() (*clientConn1, error) {
-	// Check if a net.Conn was supplied already (testing only).
-	if s.conn != nil {
-		return &clientConn1{conn: s.conn}, nil
-	}
-
-	cc := &clientConn1{
-		network: s.network,
-		addr:    s.addr,
-		dialer:  s.dialer,
-		conn:    nil,
-	}
-
-	if err := cc.dial(context.Background()); err != nil {
-		return nil, err
-	}
-
-	return cc, nil
-}
-
-// Close closes the vici session.
-func (s *Session) Close() error {
-	if err := s.el.Close(); err != nil {
-		return err
-	}
-
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.cc != nil {
-		if err := s.cc.Close(); err != nil {
-			return err
-		}
-
-		s.cc = nil
-	}
-
-	return nil
-}
-
-// SessionOption is used to specify additional options
-// to a Session.
-type SessionOption interface {
-	apply(*sessionOpts)
-}
-
-type sessionOpts struct {
 	// Network and address to use to connect to the vici socket,
 	// defaults to "unix" & "/var/run/charon.vici".
 	network string
@@ -133,22 +38,59 @@ type sessionOpts struct {
 
 	// The context dial func to use when dialing the charon socket.
 	dialer func(ctx context.Context, network, addr string) (net.Conn, error)
+}
 
-	// A net.Conn to use, instead of dialing a unix socket.
-	//
-	// This is only used for testing purposes.
-	conn net.Conn
+// NewSession returns a new vici session.
+func NewSession(opts ...SessionOption) (*Session, error) {
+	s := &Session{
+		// Set default session opts before applying
+		// the opts passed by the caller.
+		network: sessionDefaultNetwork,
+		addr:    sessionDefaultAddr,
+		dialer:  (&net.Dialer{}).DialContext,
+		cc:      nil,
+	}
+
+	for _, opt := range opts {
+		opt.apply(s)
+	}
+
+	if s.cc != nil {
+		// Testing only. A net.Conn was given.
+		return s, nil
+	}
+
+	conn, err := s.dialer(context.Background(), s.network, s.addr)
+	if err != nil {
+		return nil, err
+	}
+
+	s.cc = newClientConn(conn)
+	go s.cc.listen()
+
+	return s, nil
+}
+
+// Close closes the vici session.
+func (s *Session) Close() error {
+	return s.cc.Close()
+}
+
+// SessionOption is used to specify additional options
+// to a Session.
+type SessionOption interface {
+	apply(*Session)
 }
 
 type funcSessionOption struct {
-	f func(*sessionOpts)
+	f func(*Session)
 }
 
-func (fso *funcSessionOption) apply(s *sessionOpts) {
+func (fso *funcSessionOption) apply(s *Session) {
 	fso.f(s)
 }
 
-func newFuncSessionOption(f func(*sessionOpts)) *funcSessionOption {
+func newFuncSessionOption(f func(*Session)) *funcSessionOption {
 	return &funcSessionOption{f}
 }
 
@@ -156,7 +98,7 @@ func newFuncSessionOption(f func(*sessionOpts)) *funcSessionOption {
 // is listening on. If this option is not specified, the default
 // path, /var/run/charon.vici, is used.
 func WithSocketPath(path string) SessionOption {
-	return newFuncSessionOption(func(so *sessionOpts) {
+	return newFuncSessionOption(func(so *Session) {
 		so.network = "unix"
 		so.addr = path
 	})
@@ -170,7 +112,7 @@ func WithSocketPath(path string) SessionOption {
 // authentication properties, it is recommended to run it over a UNIX
 // socket with appropriate permissions.
 func WithAddr(network, addr string) SessionOption {
-	return newFuncSessionOption(func(so *sessionOpts) {
+	return newFuncSessionOption(func(so *Session) {
 		so.network = network
 		so.addr = addr
 	})
@@ -178,7 +120,7 @@ func WithAddr(network, addr string) SessionOption {
 
 // WithDialContext specifies the dial func to use when dialing the charon socket.
 func WithDialContext(dialer func(ctx context.Context, network, addr string) (net.Conn, error)) SessionOption {
-	return newFuncSessionOption(func(so *sessionOpts) {
+	return newFuncSessionOption(func(so *Session) {
 		so.dialer = dialer
 	})
 }
@@ -186,8 +128,8 @@ func WithDialContext(dialer func(ctx context.Context, network, addr string) (net
 // withTestConn is a SessionOption used in testing to supply a net.Conn
 // without actually dialing a unix socket.
 func withTestConn(conn net.Conn) SessionOption {
-	return newFuncSessionOption(func(so *sessionOpts) {
-		so.conn = conn
+	return newFuncSessionOption(func(so *Session) {
+		so.cc = newClientConn(conn)
 	})
 }
 
@@ -211,39 +153,10 @@ func (s *Session) CommandRequest(cmd string, msg *Message) (*Message, error) {
 // The provided context must be non-nil, and can be used to interrupt blocking network I/O
 // involved in the command request.
 func (s *Session) Call(ctx context.Context, cmd string, in *Message) (*Message, error) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
+	s.cc.Lock()
+	defer s.cc.Unlock()
 
-	if ctx == nil {
-		return nil, errors.New("ctx cannot be nil")
-	}
-
-	if s.cc == nil {
-		return nil, errors.New("session closed")
-	}
-
-	if in == nil {
-		in = NewMessage()
-	}
-	in.header = &header{
-		ptype: pktCmdRequest,
-		name:  cmd,
-	}
-
-	if err := s.cc.packetWrite(ctx, in); err != nil {
-		return nil, err
-	}
-
-	p, err := s.cc.packetRead(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	if p.header.ptype != pktCmdResponse {
-		return nil, fmt.Errorf("%v: %v", errUnexpectedResponse, p.header.ptype)
-	}
-
-	return p, p.Err()
+	return s.cc.call(ctx, cmd, in)
 }
 
 // StreamedCommandRequest sends a streamed command request to the server. StreamedCommandRequest
@@ -254,14 +167,13 @@ func (s *Session) Call(ctx context.Context, cmd string, in *Message) (*Message, 
 // Deprecated: Use the CallStreaming method instead. StreamedCommandRequest will be removed in
 // a future version.
 func (s *Session) StreamedCommandRequest(cmd string, event string, msg *Message) ([]*Message, error) {
-	resp, err := s.CallStreaming(context.Background(), cmd, event, msg)
-	if err != nil {
-		return nil, err
-	}
-
 	messages := make([]*Message, 0)
 
-	for m := range resp {
+	for m, err := range s.CallStreaming(context.Background(), cmd, event, msg) {
+		if err != nil {
+			return nil, err
+		}
+
 		messages = append(messages, m)
 	}
 
@@ -278,90 +190,56 @@ func (s *Session) StreamedCommandRequest(cmd string, event string, msg *Message)
 //
 // The provided context must be non-nil, and can be used to interrupt blocking network I/O
 // involved in the command request.
-func (s *Session) CallStreaming(ctx context.Context, cmd string, event string, in *Message) (seq iter.Seq2[*Message, error], err error) {
-	s.mu.Lock()
-	defer func() {
-		if err != nil {
-			s.mu.Unlock()
-		}
-	}()
+func (s *Session) CallStreaming(ctx context.Context, cmd string, event string, in *Message) iter.Seq2[*Message, error] {
+	s.cc.Lock()
+	defer s.cc.Unlock()
 
-	if ctx == nil {
-		return nil, errors.New("ctx cannot be nil")
-	}
+	return s.cc.stream(ctx, cmd, event, in)
+}
 
-	if s.cc == nil {
-		return nil, errors.New("session closed")
-	}
+// Event represents an event received by a Session sent from the
+// charon daemon. It contains an associated Message and corresponds
+// to one of the event types registered with Session.Listen.
+type Event struct {
+	// Name is the event type name as specified by the
+	// charon server, such as "ike-updown" or "log".
+	Name string
 
-	if in == nil {
-		in = NewMessage()
-	}
-	in.header = &header{
-		ptype: pktCmdRequest,
-		name:  cmd,
-	}
+	// Message is the Message associated with this event.
+	Message *Message
 
-	if err := s.eventRegister(ctx, event); err != nil {
-		return nil, err
-	}
-	defer func() {
-		if err != nil {
-			// nolint
-			s.eventUnregister(ctx, event)
-		}
-	}()
-
-	if err := s.cc.packetWrite(ctx, in); err != nil {
-		return nil, err
-	}
-
-	return func(yield func(*Message, error) bool) {
-		defer s.mu.Unlock()
-		// nolint
-		defer s.eventUnregister(ctx, event)
-
-		for {
-			p, err := s.cc.packetRead(ctx)
-			if err != nil {
-				yield(nil, err)
-				return
-			}
-
-			switch p.header.ptype {
-			case pktEvent:
-				if !yield(p, p.Err()) {
-					return
-				}
-			case pktCmdResponse:
-				yield(p, p.Err())
-				return // End of event stream
-			default:
-				yield(nil, fmt.Errorf("%v: %v", errUnexpectedResponse, p.header.ptype))
-				return
-			}
-		}
-	}, nil
+	// Timestamp holds the timestamp of when the client
+	// received the event.
+	Timestamp time.Time
 }
 
 // Subscribe registers the session to listen for all events given. To receive
 // events that are registered here, use NotifyEvents. An error is returned if
 // Subscribe is not able to register the given events with the charon daemon.
 func (s *Session) Subscribe(events ...string) error {
-	return s.el.registerEvents(events)
+	s.cc.Lock()
+	defer s.cc.Unlock()
+
+	return s.cc.subscribe(context.Background(), events...)
 }
 
 // Unsubscribe unregisters the given events, so the session will no longer
 // receive events of the given type. If a given event is not valid, an error
 // is retured.
 func (s *Session) Unsubscribe(events ...string) error {
-	return s.el.unregisterEvents(events, false)
+	s.cc.Lock()
+	defer s.cc.Unlock()
+
+	return s.cc.unsubscribe(context.Background(), events...)
 }
 
 // UnsubscribeAll unregisters all events that the session is currently
 // subscribed to.
 func (s *Session) UnsubscribeAll() error {
-	return s.el.unregisterEvents(nil, true)
+	s.cc.Lock()
+	defer s.cc.Unlock()
+
+	return s.cc.unsubscribe(context.Background())
 }
 
 // NotifyEvents registers c for writing received events. The Session must first
@@ -379,45 +257,10 @@ func (s *Session) UnsubscribeAll() error {
 // due to the daemon stopping or restarting, c will be closed to indicate
 // that no more events will be passed to it.
 func (s *Session) NotifyEvents(c chan<- Event) {
-	s.el.notify(c)
+	s.cc.notify(c)
 }
 
 // StopEvents stops writing received events to c.
 func (s *Session) StopEvents(c chan<- Event) {
-	s.el.stop(c)
-}
-
-func (s *Session) eventRequest(ctx context.Context, ptype uint8, event string) error {
-	p := &Message{
-		header: &header{
-			ptype: ptype,
-			name:  event,
-		},
-	}
-
-	if err := s.cc.packetWrite(ctx, p); err != nil {
-		return err
-	}
-
-	p, err := s.cc.packetRead(ctx)
-	if err != nil {
-		return err
-	}
-
-	switch p.header.ptype {
-	case pktEventConfirm:
-		return nil
-	case pktEventUnknown:
-		return fmt.Errorf("%v: %v", errEventUnknown, event)
-	default:
-		return fmt.Errorf("%v: %v", errUnexpectedResponse, p.header.ptype)
-	}
-}
-
-func (s *Session) eventRegister(ctx context.Context, event string) error {
-	return s.eventRequest(ctx, pktEventRegister, event)
-}
-
-func (s *Session) eventUnregister(ctx context.Context, event string) error {
-	return s.eventRequest(ctx, pktEventUnregister, event)
+	s.cc.unnotify(c)
 }

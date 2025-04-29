@@ -132,15 +132,17 @@ func TestCallStreaming(t *testing.T) {
 	}
 	defer s.Close()
 
-	resp, err := s.CallStreaming(context.Background(), "list-authorities", "list-authority", nil)
-	if err != nil {
-		t.Fatalf("Failed to make streaming call: %v", err)
-	}
-
-	for _, err := range resp {
+	one := false
+	for _, err := range s.CallStreaming(context.Background(), "list-authorities", "list-authority", nil) {
 		if err != nil {
 			t.Fatalf("Got error from CallStreaming: %v", err)
 		}
+
+		one = true
+	}
+
+	if !one {
+		t.Fatal("Did not receive any messages from CallStreaming")
 	}
 }
 
@@ -214,8 +216,8 @@ func TestSubscribeConsecutively(t *testing.T) {
 		t.Fatalf("Unexpected error subscribing for events: %v", err)
 	}
 
-	if !reflect.DeepEqual(s.el.events, []string{"ike-updown", "child-updown"}) {
-		t.Fatalf("Expected to find ike-updown and child-updown registered, got: %v", s.el.events)
+	if !reflect.DeepEqual(s.cc.events.list, []string{"ike-updown", "child-updown"}) {
+		t.Fatalf("Expected to find ike-updown and child-updown registered, got: %v", s.cc.events.list)
 	}
 
 	if err := s.Subscribe("child-updown", "log", "ike-updown"); err != nil {
@@ -223,8 +225,8 @@ func TestSubscribeConsecutively(t *testing.T) {
 	}
 
 	// Only the 'log' event should have been added.
-	if !reflect.DeepEqual(s.el.events, []string{"ike-updown", "child-updown", "log"}) {
-		t.Fatalf("Expected to find ike-updown and child-updown registered, got: %v", s.el.events)
+	if !reflect.DeepEqual(s.cc.events.list, []string{"ike-updown", "child-updown", "log"}) {
+		t.Fatalf("Expected to find ike-updown and child-updown registered, got: %v", s.cc.events.list)
 	}
 }
 
