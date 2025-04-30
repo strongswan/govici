@@ -5,10 +5,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
+### Added
+
+- Session.Call, a context-aware alternative to Session.CommandRequest.
+- Session.CallStreaming, a context-aware alternative to Session.StreamedCommandRequest. Another important distinction is that Session.CallStreaming returns an `iter.Seq2[*vici.Message, error]` so that the call does not block until all events associated with the call have been received (as is the case with Session.StreamedCommandRequest). Instead, a caller can iterate over the returned `iter.Seq2[*vici.Message, error]` to handle the events as they come in.
+- Message.String() implementation. This provides a convenient way to get a string representation of a Message.
+
 ### Changed
 
+- Require go 1.24.
 - Re-factor transport into clientConn type that is context-aware.
-- Add safePutUint{8,16,32} helpers to avoid potential overflow bugs.
+
+### Deprecated
+
+- Deprecated Session.CommandRequest in favor of Session.Call. This will be removed in a future release.
+- Deprecated Session.StreamedCommandRequest in favor of Session.CallStreaming. This will be removed in a future release.
 
 ## [v0.7.0] - 2023-02-24
 
