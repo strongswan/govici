@@ -12,13 +12,12 @@ Let's start with a simple example to try and understand how vici works. If you a
 ```go
 s, err := vici.NewSession()
 if err != nil {
-        fmt.Println(err)
-        return
+        return err
 }
 defer s.Close() 
 ```
 
-Say we wanted to get the version information of the charon daemon running on our system. If we look at the [vici README](https://www.strongswan.org/apidoc/md_src_libcharon_plugins_vici_README.html), we can find the `version` command in the **Client-initiated commands** section. The README gives the following definition of the `version` command's message parameters:
+Say we wanted to get the version information of the charon daemon running on our system. If we look at the [vici README](https://github.com/strongswan/strongswan/blob/master/src/libcharon/plugins/vici/README.md), we can find the `version` command in the **Client-initiated commands** section. The README gives the following definition of the `version` command's message parameters:
 
 ```
 {} => {
@@ -30,33 +29,44 @@ Say we wanted to get the version information of the charon daemon running on our
 }
 ```
 
-This means that the command does not accept any arguments, and returns five key-value pairs. So, there is no need to construct a request message for this command. Now all we have to do is make a command request using the `Session.CommandRequest` function.
+This means that the command does not accept any arguments, and returns five key-value pairs. So, there is no need to construct a request message for this command. Now all we have to do is make a command request using the `Session.Call` function.
 
 ```go
 package main
 
 import (
+        "context"
         "fmt"
+        "os"
+        "time"
 
         "github.com/strongswan/govici/vici"
 )
 
+func showVersion() error {
+        s, err := vici.NewSession()
+        if err != nil {
+                return err
+        }
+        defer s.Close()
+
+        ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+        defer cancel()
+
+        m, err := s.Call(ctx, "version", nil)
+        if err != nil {
+                return err
+        }
+
+        fmt.Println(m)
+
+        return nil
+}
+
 func main() {
-        session, err := vici.NewSession()
-        if err != nil {
-                fmt.Println(err)
-                return
-        }
-        defer session.Close()
-
-        m, err := session.CommandRequest("version", nil)
-        if err != nil {
-                fmt.Println(err)
-                return
-        }
-
-        for _, k := range m.Keys() {
-                fmt.Printf("%v: %v\n", k, m.Get(k))
+        if err := showVersion(); err != nil {
+		        fmt.Fprintln(os.Stderr, "Error:", err)
+                os.Exit(1)
         }
 }
 ``` 
@@ -64,86 +74,143 @@ func main() {
 On my machine, this gives me:
 
 ```
-daemon: charon
-version: 5.6.2
-sysname: Linux
-release: 4.15.0-72-generic
-machine: x86_64
+{
+  daemon = charon-systemd
+  version = 5.9.13
+  sysname = Linux
+  release = 6.14.0-29-generic
+  machine = x86_64
+}
 ```
 
 ## Streamed Command Requests
 
-Another important concept in vici is server-issued events. A complete list of defined events can be found in the **Server-issued events** section of the [vici README](https://www.strongswan.org/apidoc/md_src_libcharon_plugins_vici_README.html). Some commands, for example the `list-certs` command, work by streaming a certain event type for the duration of the command request. In the case of `list-certs`, charon streams messages of the `list-cert` event type. We can make these types of commmand requests with `Session.StreamedCommandRequest`. When making a streamed command request, it is our job to tell the daemon which type of event we want to listen for during the command.
+Another important concept in vici is server-issued events. A complete list of defined events can be found in the **Server-issued events** section of the [vici README](https://github.com/strongswan/strongswan/blob/master/src/libcharon/plugins/vici/README.md). Some commands, for example the `list-conns` command, work by streaming a certain event type for the duration of the command request. In the case of `list-conns`, charon streams messages of the `list-conn` event type. We can make these types of commmand requests with `Session.CallStreaming`. When making a streamed command request, it is our job to tell the daemon which type of event we want to listen for during the command.
 
-Let's continue with the `list-certs` example. We know the name of the command, `list-certs`, and we know we need to tell the daemon to stream `list-cert` events. If we look at the command's message parameters, we see some optional parameters:
+Let's continue with the `list-conns` example. We know the name of the command, `list-conns`, and we know we need to tell the daemon to stream `list-conn` events. If we look at the command's message parameters, we see one optional parameter:
 
 ```
 {
-    type = <certificate type to filter for, X509|X509_AC|X509_CRL|
-                                            OCSP_RESPONSE|PUBKEY  or ANY>
-    flag = <X.509 certificate flag to filter for, NONE|CA|AA|OCSP or ANY>
-    subject = <set to list only certificates having subject>
+	ike = <list connections matching a given configuration name only>
 } => {
-    # completes after streaming list-cert events
+	# completes after streaming list-conn events
 }
 ```
 
-Where each `list-cert` event contains the following information:
+Where each `list-conn` event contains the following information:
 
 ```
 {
-    type = <certificate type, X509|X509_AC|X509_CRL|OCSP_RESPONSE|PUBKEY>
-    flag = <X.509 certificate flag, NONE|CA|AA|OCSP>
-    has_privkey = <set if a private key for the certificate is available>
-    data = <ASN1 encoded certificate data>
-    subject = <subject string if defined and certificate type is PUBKEY>
-    not-before = <time string if defined and certificate type is PUBKEY>
-    not-after  = <time string if defined and certificate type is PUBKEY>
+	<IKE_SA connection name> = {
+		local_addrs = [
+			<list of valid local IKE endpoint addresses>
+		]
+		remote_addrs = [
+			<list of valid remote IKE endpoint addresses>
+		]
+		local_port = <local IKE endpoint port>
+		remote_port = <remote IKE endpoint port>
+		version = <IKE version as string, IKEv1|IKEv2 or 0 for any>
+		reauth_time = <IKE_SA reauthentication interval in seconds>
+		rekey_time = <IKE_SA rekeying interval in seconds>
+
+		local*, remote* = { # multiple local and remote auth sections
+			class = <authentication type>
+			eap-type = <EAP type to authenticate if when using EAP>
+			eap-vendor = <EAP vendor for type, if any>
+			xauth = <xauth backend name>
+			revocation = <revocation policy>
+			id = <IKE identity>
+			aaa_id = <AAA authentication backend identity>
+			eap_id = <EAP identity for authentication>
+			xauth_id = <XAuth username for authentication>
+			groups = [
+				<group membership required to use connection>
+			]
+			certs = [
+				<certificates allowed for authentication>
+			]
+			cacerts = [
+				<CA certificates allowed for authentication>
+			]
+		}
+		children = {
+			<CHILD_SA config name>* = {
+				mode = <IPsec mode>
+				label = <hex encoded security label>
+				rekey_time = <CHILD_SA rekeying interval in seconds>
+				rekey_bytes = <CHILD_SA rekeying interval in bytes>
+				rekey_packets = <CHILD_SA rekeying interval in packets>
+				local-ts = [
+					<list of local traffic selectors>
+				]
+				remote-ts = [
+					<list of remote traffic selectors>
+				]
+			}
+		}
+	}
 }
 ```
 
-So, let's say we wanted to filter the results to only list CA certs. We can accomplish this by doing the following:
+So, let's write a simple program to print the loaded connections, optionally by IKE name:
 
 ```go
 package main
 
 import (
+        "context"
+        "flag"
         "fmt"
+        "os"
+        "time"
 
         "github.com/strongswan/govici/vici"
 )
 
-func main() {
-        session, err := vici.NewSession()
+func showConns(ike string) error {
+        s, err := vici.NewSession()
         if err != nil {
-                fmt.Println(err)
-                return
+                return err
         }
-        defer session.Close()
+        defer s.Close()
 
-        m := vici.NewMessage()
-        
-        if err := m.Set("flag", "CA"); err != nil {
-                fmt.Println(err)
-                return
-        }
+        var in *vici.Message
 
-        ms, err := session.StreamedCommandRequest("list-certs", "list-cert", m)
-        if err != nil {
-                fmt.Println(err)
-                return
-        }
+        if ike != "" {
+                in = vici.NewMessage()
 
-        for _, m := range ms {
-                if m.Err() != nil {
-                        fmt.Println(err)
-                        return
+                if err := in.Set("ike", ike); err != nil {
+                        return err
                 }
-                
-                // Process CA cert information
-                // ...        
+        }
+
+        ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+        defer cancel()
+
+        for m, err := range s.CallStreaming(ctx, "list-conns", "list-conn", in) {
+                if err != nil {
+                        return err
+                }
+
+                fmt.Println(m)
+        }
+
+        return nil
+}
+
+func main() {
+        var ike string
+
+        flag.StringVar(&ike, "ike", "", "Filter conns by IKE SA name")
+        flag.Parse()
+
+        if err := showConns(ike); err != nil {
+		        fmt.Fprintln(os.Stderr, "Error:", err)
+                os.Exit(1)
         }
 }
+
 ``` 
 
 ## Event Listener
@@ -154,58 +221,78 @@ A `Session` can also be used to listen for specific server-issued events at any 
 package main
 
 import (
-	"fmt"
+        "errors"
+        "flag"
+        "fmt"
+        "os"
 
-	"github.com/strongswan/govici/vici"
+        "github.com/strongswan/govici/vici"
 )
 
+func monitor(ike string) error {
+        if ike == "" {
+                return errors.New("must specify IKE SA name")
+        }
+
+        s, err := vici.NewSession()
+        if err != nil {
+                return err
+        }
+        defer s.Close()
+
+        ec := make(chan vici.Event, 16)
+
+        s.NotifyEvents(ec)
+        defer s.StopEvents(ec)
+
+        // Subscribe to 'ike-updown' and 'log' events.
+        if err := s.Subscribe("ike-updown", "log"); err != nil {
+                return err
+        }
+
+        for {
+                e, ok := <-ec
+                if !ok {
+                        // Event listener closed.
+                        return nil
+                }
+
+                // The Event.Name field corresponds to the event name
+                // we used to make the subscription. The Event.Message
+                // field contains the Message from the server.
+                switch e.Name {
+                case "ike-updown":
+                        m, ok := e.Message.Get(ike).(*vici.Message)
+                        if !ok {
+                                // This message is not about the IKE SA we are
+                                // monitoring. Ignore.
+                                continue
+                        }
+
+                        fmt.Printf("IKE-UPDOWN: %s state changed: %s\n", ike, m.Get("state"))
+                case "log":
+                        if s, ok := e.Message.Get("ikesa-name").(string); !ok || s != ike {
+                                // This message is not about the IKE SA we are
+                                // monitoring. Ignore.
+                                continue
+                        }
+
+                        // Log events contain a 'msg' field with the log message
+                        fmt.Println("LOG:", e.Message.Get("msg"))
+                }
+        }
+}
+
 func main() {
-	session, err := vici.NewSession()
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-	defer session.Close()
+        var ike string
 
-	ec := make(chan vici.Event, 16)
+        flag.StringVar(&ike, "ike", "", "Name of IKE SA to monitor.")
+        flag.Parse()
 
-	session.NotifyEvents(ec)
-	defer session.StopEvents(ec)
-
-	// Subscribe to 'ike-updown' and 'log' events.
-	if err := session.Subscribe("ike-updown", "log"); err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	// IKE SA configuration name
-	name := "rw"
-
-	for {
-		e, ok := <-ec
-		if !ok {
-			fmt.Println("Event listener closed")
-			return
-		}
-
-		// The Event.Name field corresponds to the event name
-		// we used to make the subscription. The Event.Message
-		// field contains the Message from the server.
-		switch e.Name {
-		case "ike-updown":
-			m, ok := e.Message.Get(name).(*vici.Message)
-			if !ok {
-				fmt.Printf("Expected *Message in field 'name', but got %T\n", e.Message.Get(name))
-				continue
-			}
-
-			state := m.Get("state")
-			fmt.Printf("IKE SA state changed (name=%s): %s\n", name, state)
-		case "log":
-			// Log events contain a 'msg' field with the log message
-			fmt.Println(e.Message.Get("msg"))
-		}
-	}
+        if err := monitor(ike); err != nil {
+                fmt.Fprintln(os.Stderr, "Error:", err)
+                os.Exit(1)
+        }
 }
 ```
 
@@ -213,7 +300,7 @@ The `Session.NotifyEvents` function is used to register a channel to receive `Ev
 
 ## Message Marshaling
 
-Some commands require a lot of parameters, or even a whole IKE SA configuration in the case of `load-conn`. Using `Message.Set` for this sort of thing is not very flexible and is quite cumbersome. The `MarshalMessage` function provides a way to easily construct a `Message` from a Go struct. To start with a simple example, let's define a struct `cert` that can be used to load certificates into the daemon using the `load-cert` command. If we look at the [vici README](https://www.strongswan.org/apidoc/md_src_libcharon_plugins_vici_README.html) again, we see the `load-cert` command's message parameters:
+Some commands require a lot of parameters, or even a whole IKE SA configuration in the case of `load-conn`. Using `Message.Set` for this sort of thing is not very flexible and is quite cumbersome. The `MarshalMessage` function provides a way to easily construct a `Message` from a Go struct. To start with a simple example, let's define a struct `cert` that can be used to load certificates into the daemon using the `load-cert` command. If we look at the [vici README](https://github.com/strongswan/strongswan/blob/master/src/libcharon/plugins/vici/README.md) again, we see the `load-cert` command's message parameters:
 
 ```
 {
@@ -236,66 +323,87 @@ type cert struct {
 }
 ```
 
-Remember, as stated on [godoc](https://godoc.org/github.com/strongswan/govici/vici#MarshalMessage), struct fields are only marshaled when they are exported and have a `vici` struct tag. Notice that the struct tags are identical to the field names in the `load-cert` message parameters. Now, we could wrap this all up into a helper function that loads a certificate into the daemon given its path on the filesystem.
+Remember, as stated on [godoc](https://pkg.go.dev/github.com/strongswan/govici/vici#MarshalMessage), struct fields are only marshaled when they are exported and have a `vici` struct tag. Notice that the struct tags are identical to the field names in the `load-cert` message parameters. Now, we could wrap this all up into a helper function that loads a certificate into the daemon given its path on the filesystem.
 
 ```go
 package main
 
 import (
-	"encoding/pem"
-	"io/ioutil"
+        "context"
+        "encoding/pem"
+        "errors"
+        "flag"
+        "fmt"
+        "io/ioutil"
+        "os"
+        "time"
 
-	"github.com/strongswan/govici/vici"
+        "github.com/strongswan/govici/vici"
 )
 
 type cert struct {
-	Type string `vici:"type"`
-	Flag string `vici:"flag"`
-	Data string `vici:"data"`
+        Type string `vici:"type"`
+        Flag string `vici:"flag"`
+        Data string `vici:"data"`
 }
 
-func loadX509Cert(path string, cacert bool) error {
-	s, err := vici.NewSession()
-	if err != nil {
-		return err
-	}
-	defer s.Close()
+func loadX509Cert(path string) error {
+        if path == "" {
+                return errors.New("must specify path")
+        }
 
-	flag := "NONE"
-	if cacert {
-		flag = "CA"
-	}
+        s, err := vici.NewSession()
+        if err != nil {
+                return err
+        }
+        defer s.Close()
 
-	// Read cert data from the file
-	data, err := ioutil.ReadFile(path)
-	if err != nil {
-		return err
-	}
+        // Read cert data from the file
+        data, err := ioutil.ReadFile(path)
+        if err != nil {
+                return err
+        }
 
-	block, _ := pem.Decode(data)
+        block, _ := pem.Decode(data)
 
-	cert := cert{
-		Type: "X509",
-		Flag: flag,
-		Data: string(block.Bytes),
-	}
+        cert := cert{
+                Type: "X509",
+                Flag: "NONE",
+                Data: string(block.Bytes),
+        }
 
-	m, err := vici.MarshalMessage(&cert)
-	if err != nil {
-		return err
-	}
+        in, err := vici.MarshalMessage(&cert)
+        if err != nil {
+                return err
+        }
 
-	_, err = s.CommandRequest("load-cert", m)
+        ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+        defer cancel()
 
-	return err
+        _, err = s.Call(ctx, "load-cert", in)
+
+        return err
 }
+
+func main() {
+        var path string
+
+        flag.StringVar(&path, "path", "", "Path to certificate to load")
+        flag.Parse()
+
+        if err := loadX509Cert(path); err != nil {
+                fmt.Fprintln(os.Stderr, "Error:", err)
+                os.Exit(1)
+        }
+}
+
 ```
 
-Pointer types can be useful to preserve defaults as specified in [swanctl.conf](https://wiki.strongswan.org/projects/strongswan/wiki/Swanctlconf) when those defaults do not align with Go zero values. For example, mobike is [enabled by default for IKEv2 connections](https://wiki.strongswan.org/projects/strongswan/wiki/Swanctlconf#connections-section), but if you have a `Mobike bool` field in your struct, the Go zero value will override the default behavior. In these situations, using `*bool` will result in the zero-value being `nil`, and the field will not be marshaled.
+Pointer types can be useful to preserve defaults as specified in [swanctl.conf](https://docs.strongswan.org/docs/latest/swanctl/swanctlConf.html) when those defaults do not align with Go zero values. For example, mobike is [enabled by default for IKEv2 connections](https://docs.strongswan.org/docs/latest/swanctl/swanctlConf.html#_connections), but if you have a `Mobike bool` field in your struct, the Go zero value will override the default behavior. In these situations, using `*bool` will result in the zero-value being `nil`, and the field will not be marshaled.
 
 ## Putting it all together
 
-For a more complicated example, let's use `load-conn` to load an IKE SA configuration. The real work in doing this is defining some types to represent our configuration. The [swanctl.conf](https://wiki.strongswan.org/projects/strongswan/wiki/Swanctlconf) documentation is the best place to look for the information we need about configuration options and structure. For our case, let's take a `swanctl.conf` from the testing environment:
+For a more complicated example, let's use `load-conn` to load an IKE SA configuration. The real work in doing this is defining some types to represent our configuration. The [swanctl.conf](https://docs.strongswan.org/docs/latest/swanctl/swanctlConf.html) documentation is the best place to look for the information we need about configuration options and structure. For our case, let's take a `swanctl.conf` from the testing environment:
 
 ```
 connections {
@@ -325,20 +433,20 @@ connections {
 }
 ```
 
-We'll create Go types that satisfy the needs of this specific configuration, a common "road warrior" scenario with certificate-based authentication. See [here](https://www.strongswan.org/testing/testresults/swanctl/rw-cert/) for details on this testing scenario. If you're more familiar with the `ipsec.conf` configuration format, see [this document](https://wiki.strongswan.org/projects/strongswan/wiki/Fromipsecconf) for help migrating to the `swanctl.conf` format.
+We'll create Go types that satisfy the needs of this specific configuration, a common "road warrior" scenario with certificate-based authentication. See [here](https://www.strongswan.org/testresults.html) for details on this testing scenario. If you're more familiar with the `ipsec.conf` configuration format, see [this document](https://wiki.strongswan.org/projects/strongswan/wiki/Fromipsecconf) for help migrating to the `swanctl.conf` format.
 
-We can start by defining a type for a connection, where the fields correspond to the [`connections.<conn>.*`](https://wiki.strongswan.org/projects/strongswan/wiki/Swanctlconf#connections-section) fields defined in the `swanctl.conf` documentation.
+We can start by defining a type for a connection, where the fields correspond to the [`connections.<conn>.*`](https://docs.strongswan.org/docs/latest/swanctl/swanctlConf.html#_connections) fields defined in the `swanctl.conf` documentation.
 
 ```go
 type connection struct {
-	Name string // This field will NOT be marshaled!
+        Name string // This field will NOT be marshaled!
 
-	LocalAddrs []string            `vici:"local_addrs"`
-	Local      *localOpts          `vici:"local"`
-	Remote     *remoteOpts         `vici:"remote"`
-	Children   map[string]*childSA `vici:"children"`
-	Version    int                 `vici:"version"`
-	Proposals  []string            `vici:"proposals"`
+        LocalAddrs []string            `vici:"local_addrs"`
+        Local      *localOpts          `vici:"local"`
+        Remote     *remoteOpts         `vici:"remote"`
+        Children   map[string]*childSA `vici:"children"`
+        Version    int                 `vici:"version"`
+        Proposals  []string            `vici:"proposals"`
 }
 ```
 
@@ -346,25 +454,25 @@ Then, we need to define `localOpts` and `remoteOpts` as referenced in the above 
 
 ```go
 type localOpts struct {
-	Auth  string   `vici:"auth"`
-	Certs []string `vici:"certs"`
-	ID    string   `vici:"id"`
+        Auth  string   `vici:"auth"`
+        Certs []string `vici:"certs"`
+        ID    string   `vici:"id"`
 }
 
 type remoteOpts struct {
-	Auth string `vici:"auth"`
+        Auth string `vici:"auth"`
 }
 ```
 
-Remember, in this example, we only include the fields that are needed for our particular swanctl.conf. But any options from the [`connections.<conn>.local<suffix>`](https://wiki.strongswan.org/projects/strongswan/wiki/Swanctlconf#connectionsltconngtlocalltsuffixgt-section) or [`connections.<conn>.remote<suffix>`](https://wiki.strongswan.org/projects/strongswan/wiki/Swanctlconf#connectionsltconngtremoteltsuffixgt-section) sections could be defined here.
+Remember, in this example, we only include the fields that are needed for our particular swanctl.conf. But any options from the [`connections.<conn>.local<suffix>`](https://docs.strongswan.org/docs/latest/swanctl/swanctlConf.html#_connections_conn_local) or [`connections.<conn>.remote<suffix>`](https://docs.strongswan.org/docs/latest/swanctl/swanctlConf.html#_connections_conn_remote) sections could be defined here.
 
 Finally, we need a `childSA` type:
 
 ```go
 type childSA struct {
-	LocalTrafficSelectors []string `vici:"local_ts"`
-	Updown                string   `vici:"updown"`
-	ESPProposals          []string `vici:"esp_proposals"`
+        LocalTrafficSelectors []string `vici:"local_ts"`
+        Updown                string   `vici:"updown"`
+        ESPProposals          []string `vici:"esp_proposals"`
 }
 ```
 
@@ -374,86 +482,82 @@ Putting this all together, we can write some helpers to load our configuration i
 package main
 
 import (
+        "context"
+        "fmt"
+        "time"
+
         "github.com/strongswan/govici/vici"
 )
 
 type connection struct {
-	Name string // This field will NOT be marshaled!
+        Name string // This field will NOT be marshaled!
 
-	LocalAddrs []string            `vici:"local_addrs"`
-	Local      *localOpts          `vici:"local"`
-	Remote     *remoteOpts         `vici:"remote"`
-	Children   map[string]*childSA `vici:"children"`
-	Version    int                 `vici:"version"`
-	Proposals  []string            `vici:"proposals"`
+        LocalAddrs []string            `vici:"local_addrs"`
+        Local      *localOpts          `vici:"local"`
+        Remote     *remoteOpts         `vici:"remote"`
+        Children   map[string]*childSA `vici:"children"`
+        Version    int                 `vici:"version"`
+        Proposals  []string            `vici:"proposals"`
 }
 
 type localOpts struct {
-	Auth  string   `vici:"auth"`
-	Certs []string `vici:"certs"`
-	ID    string   `vici:"id"`
+        Auth  string   `vici:"auth"`
+        Certs []string `vici:"certs"`
+        ID    string   `vici:"id"`
 }
 
 type remoteOpts struct {
-	Auth string `vici:"auth"`
+        Auth string `vici:"auth"`
 }
 
 type childSA struct {
-	LocalTrafficSelectors []string `vici:"local_ts"`
-	Updown                string   `vici:"updown"`
-	ESPProposals          []string `vici:"esp_proposals"`
+        LocalTrafficSelectors []string `vici:"local_ts"`
+        Updown                string   `vici:"updown"`
+        ESPProposals          []string `vici:"esp_proposals"`
 }
 
-func loadConn(conn connection) error {
-	s, err := vici.NewSession()
-	if err != nil {
-		return err
-	}
-        defer s.Close()
-
+func loadConn(s *vici.Session, conn connection) error {
 	c, err := vici.MarshalMessage(&conn)
 	if err != nil {
-		return err
+            return err
 	}
 
-        m := vici.NewMessage()
-        if err := m.Set(conn.Name, c); err != nil {
-                return err
-        }
+	in := vici.NewMessage()
+	if err := in.Set(conn.Name, c); err != nil {
+            return err
+	}
 
-	_, err = s.CommandRequest("load-conn", m)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	_, err = s.Call(ctx, "load-conn", in)
 
 	return err
 }
 
-func initiate(ike, child string) error {
-	s, err := vici.NewSession()
-	if err != nil {
-		return err
-	}
-        defer s.Close()
+func initiate(s *vici.Session, ike, child string) error {
+        in := vici.NewMessage()
 
-	m := vici.NewMessage()
+        if err := in.Set("ike", ike); err != nil {
+                return err
+        }
 
-	if err := m.Set("child", child); err != nil {
-		return err
-	}
+        if err := in.Set("child", child); err != nil {
+                return err
+        }
 
-	if err := m.Set("ike", ike); err != nil {
-		return err
-	}
+        ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+        defer cancel()
 
-	ms, err := s.StreamedCommandRequest("initiate", "control-log", m)
-	if err != nil {
-		return err
-	}
-
-	for _, msg := range ms {
-		if err := msg.Err(); err != nil {
+        for m, err := range s.CallStreaming(ctx, "initiate", "control-log", in) {
+                if err != nil {
                         return err
-		}
-	}
+                }
 
-	return nil
+                fmt.Println("LOG:", m.Get("msg"))
+        }
+
+        return nil
 }
+
 ```
