@@ -121,10 +121,45 @@ func TestCommandRequest(t *testing.T) {
 }
 
 // TestCallStreaming tests CallStreaming by calling the
-// 'list-authorities' command. Likely, there will be no authorities returned,
-// but make sure any Messages that are streamed have non-nil err.
+// 'list-certs' command, after loading a dummy cert.
 func TestCallStreaming(t *testing.T) {
 	maybeSkipIntegrationTest(t)
+
+	certdata := `-----BEGIN CERTIFICATE-----
+MIIF7zCCA9egAwIBAgIUFh/8VyNbHN6MN/EEok1XgovYr88wDQYJKoZIhvcNAQEL
+BQAwgYYxCzAJBgNVBAYTAlhYMRIwEAYDVQQIDAlTdGF0ZU5hbWUxETAPBgNVBAcM
+CENpdHlOYW1lMRQwEgYDVQQKDAtDb21wYW55TmFtZTEbMBkGA1UECwwSQ29tcGFu
+eVNlY3Rpb25OYW1lMR0wGwYDVQQDDBRDb21tb25OYW1lT3JIb3N0bmFtZTAeFw0y
+NTExMTIwMTQ3MjBaFw0yNTExMTMwMTQ3MjBaMIGGMQswCQYDVQQGEwJYWDESMBAG
+A1UECAwJU3RhdGVOYW1lMREwDwYDVQQHDAhDaXR5TmFtZTEUMBIGA1UECgwLQ29t
+cGFueU5hbWUxGzAZBgNVBAsMEkNvbXBhbnlTZWN0aW9uTmFtZTEdMBsGA1UEAwwU
+Q29tbW9uTmFtZU9ySG9zdG5hbWUwggIiMA0GCSqGSIb3DQEBAQUAA4ICDwAwggIK
+AoICAQCrq/iYHa1PXkUd2+MlerFEj6pZ5fSZ9UUmHwD3bqb2hKHTVz1tv3GGTEEL
+qkbS60Mmumj9a5pd958yi28yw9LZPcn22VoXZgXrPk1NXYla2pSNMYaunrYbs+RC
+h7hibcSUa7+c4PxdfqYfp1yGimeUjfrwJupU9p3Kt5MDLHK//6RNaMjSV1LNSI1l
+3f0Ims6qW4A4VfI4Tl6cL+zP21uPhEAqTVI+gmOODBB6prvBq3B+q5JVgQ/1xrMl
+yRHbbLGdYKkxxEgcpLBQy4QQENMxhD6k9OCZOHK7t3eb8a/y6LGPWAsLuuJhfMA0
+fPSSENljemWPzE28EaI5aFcwXxLeOBvg0ZzWz5XzfgJQ26qoCAa4JZRn8b7XL36T
+w27XVJ2fAjwJyDmh7/Un+yapRAjksSYIiDPBjiDg/SoZFCLdg/M+O4E+UnP3NBqN
+LPPbRLHiQ0IdJRHMUiDL2US9hivZrfJjuJCY8hs2eljo89+BpSVkyHVhxQ61n8NS
+h4zGFPhTdcuJMoHDlGIdNfuJ7S5PulRqsUXLxJTNXzm9Ceixabx6I4B0rzsL9Mzh
+f4Q9j61OFDu9LHKfQ3iVT96WPnQSTIxlzq6UFsaTj6M3Sy4Rtvt7BipH7J+zJhWj
+ruLjB0tT5z3A/pMsOguLG8zZkwwJYCwA9+9q8qXJG3xK7wVgpQIDAQABo1MwUTAd
+BgNVHQ4EFgQU+xRB+WN4maibXAc3D0DPU895ShAwHwYDVR0jBBgwFoAU+xRB+WN4
+maibXAc3D0DPU895ShAwDwYDVR0TAQH/BAUwAwEB/zANBgkqhkiG9w0BAQsFAAOC
+AgEAO4HXr8ptmGkr1L9X5Gl1hdUsaOdZKj2DxbMqDvyYR6O9cUdezO44wkfa0jY+
+B6AAJkTGpP8uJKjL1pPn3xAAodqCCMXz77NMl1ysCptpVml5jFBDM7IvtZJK9uSc
+kKi2kZl8Bvf0tgvdFQzjQv+oeeFzWMCg2+VmZYWUrOsqGYPQgXVFxX5tG+hEWziS
+DH1HcxUd709n664xZzxHTHML80uMEe+OXi2D0c/saSss9aJbwVw9E40RSd6QveOD
+agfBRRFsjIl12PcvzYmNGgZ//DpoEqbSfpAthbDTx/krcUhgNlPMbJl5iKmhghFB
+7P1oA5nKgcnEhJXtLup+e+QvcETybF3Egs2xEY5PsbCfradWDi+m3jZgXMTPhc8Z
+MjrxgbM8p/gTEaXg/idly75ycG8zDfdVFwnOIppD3EBiQFrmubMQJcgHlaal+uUU
+jbXKkSpUXTDeDvWhU8W2GnGHBV8xySL2hxcOA36TjF/S0IwYlFEbqSzG0i6VE1mz
+QUx8c4B6+Gj7Dl5U748o4WNfgy2z+zo8wW+w21ti6yuFQpZDzEv01PuE+6Pyo5WA
+proL5XtnotiPHx4K9WnoXhegf9iW8cY9T+fe4lxiGxHGxtArxqfLQj686eN2TjQn
+Yldvh3/2O0pPFZa+eVUrVpwQoOhmippCqKwhuQDmmOsz1Lo=
+-----END CERTIFICATE-----
+`
 
 	s, err := NewSession()
 	if err != nil {
@@ -132,8 +167,28 @@ func TestCallStreaming(t *testing.T) {
 	}
 	defer s.Close()
 
+	// First, load a certificate so that we have something to list with list-certs.
+	in, err := MarshalMessage(
+		&struct {
+			Data string `vici:"data"`
+			Type string `vici:"type"`
+			Flag string `vici:"flag"`
+		}{
+			Data: certdata,
+			Type: "x509",
+			Flag: "NONE",
+		},
+	)
+	if err != nil {
+		t.Fatalf("Failed to marshal cert: %v", err)
+	}
+
+	if _, err := s.Call(context.Background(), "load-cert", in); err != nil {
+		t.Fatalf("Failed to load test cert: %v", err)
+	}
+
 	one := false
-	for _, err := range s.CallStreaming(context.Background(), "list-authorities", "list-authority", nil) {
+	for _, err := range s.CallStreaming(context.Background(), "list-certs", "list-cert", nil) {
 		if err != nil {
 			t.Fatalf("Got error from CallStreaming: %v", err)
 		}
