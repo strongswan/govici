@@ -3,6 +3,12 @@ All notable changes to govici will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.1] - 2025-11-21
+
+### Fixed
+
+- Ensure Session.CallStreaming always returns all event messages (#50).
+
 ## [v0.8.0] - 2025-11-11
 
 ### Added
@@ -97,7 +103,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 ### Removed
 - Session.Listen API.
 
-[Unreleased]: https://github.com/strongswan/govici/compare/v0.8.0...HEAD
+[Unreleased]: https://github.com/strongswan/govici/compare/v0.8.1...HEAD
 [v0.4.0]: https://github.com/strongswan/govici/compare/v0.3.0...v0.4.0
 [v0.4.1]: https://github.com/strongswan/govici/compare/v0.4.0...v0.4.1
 [v0.5.0]: https://github.com/strongswan/govici/compare/v0.4.1...v0.5.0
@@ -106,3 +112,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 [v0.6.0]: https://github.com/strongswan/govici/compare/v0.5.2...v0.6.0
 [v0.7.0]: https://github.com/strongswan/govici/compare/v0.6.0...v0.7.0
 [v0.8.0]: https://github.com/strongswan/govici/compare/v0.7.0...v0.8.0
+[v0.8.1]: https://github.com/strongswan/govici/compare/v0.8.0...v0.8.1
