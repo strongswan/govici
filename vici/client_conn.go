@@ -60,9 +60,6 @@ type clientConn struct {
 	// reponses to waiting callers.
 	pc chan *Message
 
-	// Internal event chan buffer. Used for streaming commands.
-	ec chan Event
-
 	events struct {
 		sync.Mutex
 
@@ -76,7 +73,6 @@ func newClientConn(conn net.Conn) *clientConn {
 	cc := &clientConn{
 		conn: conn,
 		pc:   make(chan *Message, 128),
-		ec:   make(chan Event, 128),
 		err:  make(chan error, 1),
 		events: struct {
 			sync.Mutex
@@ -158,7 +154,6 @@ func (cc *clientConn) listen() {
 
 func (cc *clientConn) stop() {
 	close(cc.pc)
-	close(cc.ec)
 
 	cc.events.Lock()
 	defer cc.events.Unlock()
@@ -290,21 +285,16 @@ func (cc *clientConn) wait(ctx context.Context) (*Message, error) {
 		case <-ctx.Done():
 			return nil, ctx.Err()
 
-		case ev, ok := <-cc.ec:
-			if !ok {
-				return nil, fmt.Errorf("vici: error waiting for event: %w", io.ErrClosedPipe)
-			}
-
-			return ev.Message, nil
-
 		case p, ok := <-cc.pc:
 			if !ok {
 				return nil, fmt.Errorf("vici: error waiting for response: %w", io.ErrClosedPipe)
 			}
 
-			if p.header.seq != cc.wseq {
-				// This is not the packet you're looking for...
-				continue
+			if p.header.ptype != pktEvent {
+				if p.header.seq != cc.wseq {
+					// This is not the packet you're looking for...
+					continue
+				}
 			}
 
 			return p, nil
@@ -509,7 +499,7 @@ func (cc *clientConn) dispatch(ev Event) {
 		// This event is associated with an active streaming call.
 		// Dispatch internally only.
 		select {
-		case cc.ec <- ev:
+		case cc.pc <- ev.Message:
 		default:
 		}
 
