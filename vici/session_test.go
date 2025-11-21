@@ -201,6 +201,113 @@ Yldvh3/2O0pPFZa+eVUrVpwQoOhmippCqKwhuQDmmOsz1Lo=
 	}
 }
 
+type connection struct {
+	Name string // This field will NOT be marshaled!
+
+	Version   int                 `vici:"version"`
+	Local     *localOpts          `vici:"local"`
+	Remote    *remoteOpts         `vici:"remote"`
+	Children  map[string]*childSA `vici:"children"`
+	Proposals []string            `vici:"proposals"`
+}
+
+type localOpts struct {
+	Auth string `vici:"auth"`
+}
+
+type remoteOpts struct {
+	Auth string `vici:"auth"`
+}
+
+type childSA struct {
+	LocalTrafficSelectors []string `vici:"local_ts"`
+	ESPProposals          []string `vici:"esp_proposals"`
+}
+
+func setupTestCallStreamingMany(s *Session) error {
+	for n := 0; n < 3; n++ {
+		name := fmt.Sprintf("dummy-%d", n)
+
+		c, err := MarshalMessage(
+			&connection{
+				Name:      name,
+				Version:   2,
+				Proposals: []string{"aes256gcm16-prfsha512-ecp384"},
+				Remote: &remoteOpts{
+					Auth: "pubkey",
+				},
+				Local: &localOpts{
+					Auth: "pubkey",
+				},
+				Children: map[string]*childSA{
+					"rw": {
+						ESPProposals:          []string{"aes256gcm16-ecp384"},
+						LocalTrafficSelectors: []string{"0.0.0.0/0", "::/0"},
+					},
+				},
+			},
+		)
+		if err != nil {
+			return err
+		}
+
+		in := NewMessage()
+		if err := in.Set(name, c); err != nil {
+			return err
+		}
+
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		if _, err := s.Call(ctx, "load-conn", in); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+// TestCallStreamingMany tests CallStreaming many times in succession
+// to ensure all relevant event packets are given. Regression test
+// for https://github.com/strongswan/govici/issues/50.
+func TestCallStreamingMany(t *testing.T) {
+	maybeSkipIntegrationTest(t)
+
+	s, err := NewSession()
+	if err != nil {
+		t.Fatalf("Failed to create session: %v", err)
+	}
+	defer s.Close()
+
+	if err := setupTestCallStreamingMany(s); err != nil {
+		t.Fatalf("Failed to setup test: %v", err)
+	}
+
+	// Perform the test many times to ensure consistency.
+	for i := 0; i < 1000; i++ {
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+
+		n := 0
+		for m, err := range s.CallStreaming(ctx, "list-conns", "list-conn", nil) {
+			if err != nil {
+				t.Fatalf("Error calling list-conns: %v", err)
+			}
+
+			want := fmt.Sprintf("dummy-%d", n)
+			got := m.Keys()[0]
+			if want != got {
+				t.Fatalf("Expected list-conn event for %s, got %s", want, got)
+			}
+			n++
+		}
+
+		if n != 3 {
+			t.Fatalf("Expected 3 list-conn events, got %d (i=%d)", n, i)
+		}
+	}
+}
+
 // TestSubscribeWhenAlreadyActive tests that subscriptions can
 // be made incrementally. Namely, a caller can subcribe to one set
 // of events, and later add to the subcribed events.
