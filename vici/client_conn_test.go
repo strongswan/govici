@@ -514,7 +514,7 @@ func TestClientConnRead(t *testing.T) {
 }
 
 func TestClientConnWait(t *testing.T) {
-	synctest.Run(func() {
+	synctest.Test(t, func(t *testing.T) {
 		cc, ts := newTestClientServer()
 		defer cc.conn.Close()
 		defer ts.conn.Close()
@@ -563,7 +563,7 @@ func TestClientConnWait(t *testing.T) {
 }
 
 func TestClientConnWaitNoResponse(t *testing.T) {
-	synctest.Run(func() {
+	synctest.Test(t, func(t *testing.T) {
 		cc, ts := newTestClientServer()
 		defer cc.conn.Close()
 		defer ts.conn.Close()
@@ -601,7 +601,7 @@ func TestClientConnWaitNoResponse(t *testing.T) {
 }
 
 func TestClientConnWaitDelayedResponse(t *testing.T) {
-	synctest.Run(func() {
+	synctest.Test(t, func(t *testing.T) {
 		cc, ts := newTestClientServer()
 		defer cc.conn.Close()
 		defer ts.conn.Close()
@@ -681,7 +681,7 @@ func TestClientConnSubscribe(t *testing.T) {
 }
 
 func TestClientConnNotify(t *testing.T) {
-	synctest.Run(func() {
+	synctest.Test(t, func(t *testing.T) {
 		cc, ts := newTestClientServer()
 		defer cc.conn.Close()
 		defer ts.conn.Close()
