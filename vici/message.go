@@ -574,6 +574,8 @@ func (m *Message) decode(data []byte) error {
 				return err
 			}
 			buf.Next(n)
+		default:
+			return fmt.Errorf("%v: invalid byte %v looking for next element type", errDecoding, b)
 		}
 	}
 
