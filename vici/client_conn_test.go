@@ -372,7 +372,7 @@ func (ts *testServer) serve() {
 
 				switch p.header.ptype {
 				case pktCmdRequest:
-					resp.header.ptype = pktCmdUnkown
+					resp.header.ptype = pktCmdUnknown
 				case pktEventRegister, pktEventUnregister:
 					resp.header.ptype = pktEventUnknown
 				}

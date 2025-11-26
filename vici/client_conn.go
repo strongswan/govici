@@ -124,7 +124,7 @@ func (cc *clientConn) listen() {
 
 		case /* Responses to normal command requests and event registration. */
 			pktCmdResponse,
-			pktCmdUnkown,
+			pktCmdUnknown,
 			pktEventConfirm,
 			pktEventUnknown:
 
