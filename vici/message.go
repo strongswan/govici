@@ -442,21 +442,23 @@ func safePutUint32(buf *bytes.Buffer, val int) error {
 func (m *Message) encode() ([]byte, error) {
 	buf := bytes.NewBuffer([]byte{})
 
-	if m.header != nil {
-		if err := buf.WriteByte(m.header.ptype); err != nil {
+	if !m.packetIsValid() {
+		return nil, fmt.Errorf("%v: cannot encode invalid packet", errEncoding)
+	}
+
+	if err := buf.WriteByte(m.header.ptype); err != nil {
+		return nil, fmt.Errorf("%v: %v", errEncoding, err)
+	}
+
+	if m.packetIsNamed() {
+		err := safePutUint8(buf, len(m.header.name))
+		if err != nil {
 			return nil, fmt.Errorf("%v: %v", errEncoding, err)
 		}
 
-		if m.packetIsNamed() {
-			err := safePutUint8(buf, len(m.header.name))
-			if err != nil {
-				return nil, fmt.Errorf("%v: %v", errEncoding, err)
-			}
-
-			_, err = buf.WriteString(m.header.name)
-			if err != nil {
-				return nil, fmt.Errorf("%v: %v", errEncoding, err)
-			}
+		_, err = buf.WriteString(m.header.name)
+		if err != nil {
+			return nil, fmt.Errorf("%v: %v", errEncoding, err)
 		}
 	}
 
