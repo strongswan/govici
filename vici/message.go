@@ -532,6 +532,9 @@ func (m *Message) decode(data []byte) error {
 		if err != nil {
 			return fmt.Errorf("%v: %v", errDecoding, err)
 		}
+		if l == 0 {
+			return fmt.Errorf("%v: named packet does not have valid name", errDecoding)
+		}
 
 		name := buf.Next(int(l))
 		if len(name) != int(l) {
