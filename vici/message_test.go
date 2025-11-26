@@ -810,3 +810,37 @@ func TestEmptyMessageElement(t *testing.T) {
 		}
 	}
 }
+
+// FuzzDecode fuzzes the decoding of raw data into message packets, and vice versa.
+func FuzzEncodeDecode(f *testing.F) {
+	testcases := [][]byte{
+		goldNamedPacketBytes,
+		goldUnnamedPacketBytes,
+		goldMessageBytes,
+	}
+
+	for _, tc := range testcases {
+		f.Add(tc)
+	}
+
+	f.Fuzz(func(t *testing.T, data []byte) {
+		m := NewMessage()
+
+		if err := m.decode(data); err != nil {
+			return
+		}
+
+		if !m.packetIsValid() {
+			t.Errorf("Decoded packet is invalid:\n\npacket: %+v\n\ndata: %v", m, data)
+		}
+
+		encoded, err := m.encode()
+		if err != nil {
+			t.Errorf("Error re-encoding the packet: %v\n\npacket: %+v\n\ndata: %v", err, m, data)
+		}
+
+		if !bytes.Equal(encoded, data) {
+			t.Errorf("Re-encoded data does not match the original:\n\nencoded: %+v\n\ndata: %v", encoded, data)
+		}
+	})
+}
