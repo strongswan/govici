@@ -598,6 +598,10 @@ func (m *Message) decode(data []byte) error {
 // one byte for message element type, one byte for key length, and two bytes for value
 // length.
 func (m *Message) encodeKeyValue(key, value string) ([]byte, error) {
+	if key == "" {
+		return nil, fmt.Errorf("%v: cannot encode empty key", errEncoding)
+	}
+
 	// Initialize buffer to indictate the message element type
 	// is a key-value pair
 	buf := bytes.NewBuffer([]byte{msgKeyValue})
@@ -633,6 +637,10 @@ func (m *Message) encodeKeyValue(key, value string) ([]byte, error) {
 // list item: one for message element type, and two for item length. Another three
 // bytes are used to indicate list start and list stop, and the length of the key.
 func (m *Message) encodeList(key string, list []string) ([]byte, error) {
+	if key == "" {
+		return nil, fmt.Errorf("%v: cannot encode empty key", errEncoding)
+	}
+
 	// Initialize buffer to indictate the message element type
 	// is the start of a list
 	buf := bytes.NewBuffer([]byte{msgListStart})
@@ -678,6 +686,10 @@ func (m *Message) encodeList(key string, list []string) ([]byte, error) {
 
 // encodeSection will return a byte slice of an encoded section
 func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
+	if key == "" {
+		return nil, fmt.Errorf("%v: cannot encode empty key", errEncoding)
+	}
+
 	// Initialize buffer to indictate the message element type
 	// is the start of a section
 	buf := bytes.NewBuffer([]byte{msgSectionStart})
