@@ -442,6 +442,10 @@ func safePutUint32(buf *bytes.Buffer, val int) error {
 func (m *Message) encode() ([]byte, error) {
 	buf := bytes.NewBuffer([]byte{})
 
+	if !m.packetIsValid() {
+		return nil, fmt.Errorf("%v: cannot encode invalid packet", errEncoding)
+	}
+
 	if m.header != nil {
 		if err := buf.WriteByte(m.header.ptype); err != nil {
 			return nil, fmt.Errorf("%v: %v", errEncoding, err)
