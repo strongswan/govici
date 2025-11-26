@@ -768,6 +768,9 @@ func (m *Message) decodeKeyValue(data []byte) (int, error) {
 	if err != nil {
 		return -1, fmt.Errorf("%v: %v", errDecoding, err)
 	}
+	if n == 0 {
+		return -1, fmt.Errorf("%v: key cannot be empty", errDecoding)
+	}
 
 	keyLen := int(n)
 	key := string(buf.Next(keyLen))
@@ -810,6 +813,9 @@ func (m *Message) decodeList(data []byte) (int, error) {
 	n, err := buf.ReadByte()
 	if err != nil {
 		return -1, fmt.Errorf("%v: %v", errDecoding, err)
+	}
+	if n == 0 {
+		return -1, fmt.Errorf("%v: key cannot be empty", errDecoding)
 	}
 
 	keyLen := int(n)
@@ -882,6 +888,9 @@ func (m *Message) decodeSection(data []byte) (int, error) {
 	n, err := buf.ReadByte()
 	if err != nil {
 		return -1, fmt.Errorf("%v: %v", errDecoding, err)
+	}
+	if n == 0 {
+		return -1, fmt.Errorf("%v: key cannot be empty", errDecoding)
 	}
 
 	keyLen := int(n)
