@@ -117,7 +117,7 @@ var (
 
 // Message represents a vici message as described in the vici README:
 //
-//	https://www.strongswan.org/apidoc/md_src_libcharon_plugins_vici_README.html
+//	https://github.com/strongswan/strongswan/blob/master/src/libcharon/plugins/vici/README.md
 //
 // A message supports encoding key-value pairs, lists, and sub-sections (or sub-messages).
 // Within a Message, each value, list, and sub-section is keyed by a string.
