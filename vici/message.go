@@ -60,7 +60,7 @@ const (
 	pktCmdResponse
 
 	// An unnamed response if requested command is unknown
-	pktCmdUnkown
+	pktCmdUnknown
 
 	// A named event registration request
 	pktEventRegister
@@ -305,7 +305,7 @@ func (m *Message) packetIsNamed() bool {
 
 	case /* Un-named packet types */
 		pktCmdResponse,
-		pktCmdUnkown,
+		pktCmdUnknown,
 		pktEventConfirm,
 		pktEventUnknown:
 
