@@ -350,9 +350,13 @@ func (m *Message) packetIsRequest() bool {
 	}
 }
 
-func (m *Message) addItem(key string, value any) error {
+func (m *Message) addItemFull(key string, value any, unique bool) error {
 	// Check if the key is already set in the message
 	_, exists := m.data[key]
+
+	if exists && unique {
+		return fmt.Errorf("key %v already exists in message", key)
+	}
 
 	switch v := value.(type) {
 	case string:
@@ -371,6 +375,14 @@ func (m *Message) addItem(key string, value any) error {
 	}
 
 	return nil
+}
+
+func (m *Message) addItemUnique(key string, value any) error {
+	return m.addItemFull(key, value, true)
+}
+
+func (m *Message) addItem(key string, value any) error {
+	return m.addItemFull(key, value, false)
 }
 
 func (m *Message) elements() iter.Seq2[string, any] {
@@ -766,8 +778,7 @@ func (m *Message) decodeKeyValue(data []byte) (int, error) {
 		return -1, errBadValue
 	}
 
-	err = m.addItem(key, value)
-	if err != nil {
+	if err := m.addItemUnique(key, value); err != nil {
 		return -1, fmt.Errorf("%v: %v", errDecoding, err)
 	}
 
@@ -843,8 +854,7 @@ func (m *Message) decodeList(data []byte) (int, error) {
 		count += valueLen + 3
 	}
 
-	err = m.addItem(key, list)
-	if err != nil {
+	if err := m.addItemUnique(key, list); err != nil {
 		return -1, fmt.Errorf("%v: %v", errDecoding, err)
 	}
 
@@ -923,8 +933,7 @@ func (m *Message) decodeSection(data []byte) (int, error) {
 		count++
 	}
 
-	err = m.addItem(key, section)
-	if err != nil {
+	if err := m.addItemUnique(key, section); err != nil {
 		return -1, err
 	}
 
