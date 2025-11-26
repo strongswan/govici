@@ -520,6 +520,9 @@ func (m *Message) decode(data []byte) error {
 	if err != nil {
 		return fmt.Errorf("%v: %v", errDecoding, err)
 	}
+	if b >= pktInvalid {
+		return fmt.Errorf("%v: invalid packet type %v", errDecoding, b)
+	}
 	m.header.ptype = b
 
 	if m.packetIsNamed() {
