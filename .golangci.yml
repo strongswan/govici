@@ -1,62 +1,52 @@
+version: "2"
 run:
-  timeout: 5m
   allow-parallel-runners: true
-
+linters:
+  default: none
+  enable:
+    - bodyclose
+    - copyloopvar
+    - depguard
+    - dogsled
+    - dupl
+    - errcheck
+    - gocritic
+    - gocyclo
+    - godox
+    - goprintffuncname
+    - gosec
+    - govet
+    - ineffassign
+    - misspell
+    - nakedret
+    - prealloc
+    - revive
+    - rowserrcheck
+    - staticcheck
+    - unconvert
+    - unparam
+    - unused
+    - whitespace
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
 issues:
   max-same-issues: 0
-
-linters:
-  disable-all: true
+formatters:
   enable:
-#  - asciicheck
-  - bodyclose
-  - unused
-  - depguard
-  - dogsled
-  - dupl
-  - errcheck
-#  - exhaustive
-#  - exportloopref
-#  - funlen
-#  - gci
-#  - gochecknoglobals
-#  - gochecknoinits
-#  - gocognit
-#  - goconst
-  - gocritic
-  - gocyclo
-#  - godot
-  - godox
-#  - goerr113
-  - gofmt
-#  - gofumpt
-#  - goheader
-  - goimports
-  - revive
-#  - gomnd
-#  - gomodguard
-  - goprintffuncname
-  - gosec
-  - gosimple
-  - govet
-  - ineffassign
-#  - lll
-  - misspell
-  - nakedret
-#  - nestif
-#  - nlreturn
-#  - noctx
-#  - nolintlint
-  - prealloc
-  - rowserrcheck
-  - copyloopvar
-#  - sqlclosecheck
-  - staticcheck
-  - stylecheck
-#  - testpackage
-  - typecheck
-  - unconvert
-  - unparam
-  - unused
-  - whitespace
-#  - wsl
+    - gofmt
+    - goimports
+  exclusions:
+    generated: lax
+    paths:
+      - third_party$
+      - builtin$
+      - examples$
