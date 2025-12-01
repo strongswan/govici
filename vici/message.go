@@ -565,25 +565,19 @@ func (m *Message) decode(data []byte) error {
 		// Determine the next message element
 		switch b {
 		case msgKeyValue:
-			n, err := m.decodeKeyValue(buf.Bytes())
-			if err != nil {
+			if err := m.decodeKeyValue(buf); err != nil {
 				return err
 			}
-			buf.Next(n)
 
 		case msgListStart:
-			n, err := m.decodeList(buf.Bytes())
-			if err != nil {
+			if err := m.decodeList(buf); err != nil {
 				return err
 			}
-			buf.Next(n)
 
 		case msgSectionStart:
-			n, err := m.decodeSection(buf.Bytes())
-			if err != nil {
+			if err := m.decodeSection(buf); err != nil {
 				return err
 			}
-			buf.Next(n)
 		default:
 			return fmt.Errorf("%v: invalid byte %v looking for next element type", errDecoding, b)
 		}
@@ -759,204 +753,159 @@ func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
 }
 
 // decodeKeyValue will decode a key-value pair and write it to the message's
-// data, and returns the number of bytes decoded.
-func (m *Message) decodeKeyValue(data []byte) (int, error) {
-	buf := bytes.NewBuffer(data)
-
+// data.
+func (m *Message) decodeKeyValue(buf *bytes.Buffer) error {
 	// Read the key from the buffer
 	n, err := buf.ReadByte()
 	if err != nil {
-		return -1, fmt.Errorf("%v: %v", errDecoding, err)
+		return fmt.Errorf("%v: %v", errDecoding, err)
 	}
 	if n == 0 {
-		return -1, fmt.Errorf("%v: key cannot be empty", errDecoding)
+		return fmt.Errorf("%v: key cannot be empty", errDecoding)
 	}
 
 	keyLen := int(n)
 	key := string(buf.Next(keyLen))
 	if len(key) != keyLen {
-		return -1, errBadKey
+		return errBadKey
 	}
 
 	// Read the value's length
 	v := buf.Next(2)
 	if len(v) != 2 {
-		return -1, errEndOfBuffer
+		return errEndOfBuffer
 	}
 
 	// Read the value from the buffer
 	valueLen := int(binary.BigEndian.Uint16(v))
 	value := string(buf.Next(valueLen))
 	if len(value) != valueLen {
-		return -1, errBadValue
+		return errBadValue
 	}
 
 	if err := m.addItemUnique(key, value); err != nil {
-		return -1, fmt.Errorf("%v: %v", errDecoding, err)
+		return fmt.Errorf("%v: %v", errDecoding, err)
 	}
 
-	// Return the total number of bytes read. Specifically,
-	// we have 1 byte for the key length, n (keyLen) bytes
-	// for the key itself, 2 bytes for the value length, and
-	// k (valueLen) bytes for the value itself.
-	return keyLen + valueLen + 3, nil
+	return nil
 }
 
-// decodeList will decode a list and write it to the message's data, and return
-// the number of bytes decoded.
-func (m *Message) decodeList(data []byte) (int, error) {
+// decodeList will decode a list and write it to the message's data.
+func (m *Message) decodeList(buf *bytes.Buffer) error {
 	var list []string
-
-	buf := bytes.NewBuffer(data)
 
 	// Read the key from the buffer
 	n, err := buf.ReadByte()
 	if err != nil {
-		return -1, fmt.Errorf("%v: %v", errDecoding, err)
+		return fmt.Errorf("%v: %v", errDecoding, err)
 	}
 	if n == 0 {
-		return -1, fmt.Errorf("%v: key cannot be empty", errDecoding)
+		return fmt.Errorf("%v: key cannot be empty", errDecoding)
 	}
 
 	keyLen := int(n)
 	key := string(buf.Next(keyLen))
 	if len(key) != keyLen {
-		return -1, errBadKey
+		return errBadKey
 	}
 
 	b, err := buf.ReadByte()
 	if err != nil {
-		return -1, fmt.Errorf("%v: %v", errDecoding, err)
+		return fmt.Errorf("%v: %v", errDecoding, err)
 	}
-
-	// Start a counter to keep track of bytes decoded.
-	//
-	// So far, we've read one byte for the key length,
-	// n (keyLen) bytes for the key itself, and one byte
-	// to start the first list item.
-	count := keyLen + 2
 
 	// Read the list from the buffer
 	for b != msgListEnd {
 		// Ensure this is the beginning of a list item
 		if b != msgListItem {
-			return -1, errExpectedBeginning
+			return errExpectedBeginning
 		}
 
 		// Read the value's length
 		v := buf.Next(2)
 		if len(v) != 2 {
-			return -1, errEndOfBuffer
+			return errEndOfBuffer
 		}
 
 		// Read the value from the buffer
 		valueLen := int(binary.BigEndian.Uint16(v))
 		value := string(buf.Next(valueLen))
 		if len(value) != valueLen {
-			return -1, errBadValue
+			return errBadValue
 		}
 
 		list = append(list, value)
 
 		b, err = buf.ReadByte()
 		if err != nil {
-			return -1, fmt.Errorf("%v: %v", errDecoding, err)
+			return fmt.Errorf("%v: %v", errDecoding, err)
 		}
-
-		// In this iteration, we've read 2 bytes to get the
-		// length of the list item, n (valueLen) bytes for
-		// the value itself, and one more byte to either
-		// (a) start the next list item, or (b) end the list.
-		count += valueLen + 3
 	}
 
 	if err := m.addItemUnique(key, list); err != nil {
-		return -1, fmt.Errorf("%v: %v", errDecoding, err)
+		return fmt.Errorf("%v: %v", errDecoding, err)
 	}
 
-	return count, nil
+	return nil
 }
 
-// decodeSection will decode a section into a message's data, and return the number
-// of bytes decoded.
-func (m *Message) decodeSection(data []byte) (int, error) {
+// decodeSection will decode a section into a message's data.
+func (m *Message) decodeSection(buf *bytes.Buffer) error {
 	section := NewMessage()
-
-	buf := bytes.NewBuffer(data)
 
 	// Read the key from the buffer
 	n, err := buf.ReadByte()
 	if err != nil {
-		return -1, fmt.Errorf("%v: %v", errDecoding, err)
+		return fmt.Errorf("%v: %v", errDecoding, err)
 	}
 	if n == 0 {
-		return -1, fmt.Errorf("%v: key cannot be empty", errDecoding)
+		return fmt.Errorf("%v: key cannot be empty", errDecoding)
 	}
 
 	keyLen := int(n)
 	key := string(buf.Next(keyLen))
 	if len(key) != keyLen {
-		return -1, errBadKey
+		return errBadKey
 	}
 
 	b, err := buf.ReadByte()
 	if err != nil {
-		return -1, fmt.Errorf("%v: %v", errDecoding, err)
+		return fmt.Errorf("%v: %v", errDecoding, err)
 	}
-
-	// Keep track of bytes decoded
-	count := keyLen + 2
 
 	for b != msgSectionEnd {
 		// Determine the next message element
 		switch b {
 		case msgKeyValue:
-			n, err := section.decodeKeyValue(buf.Bytes())
-			if err != nil {
-				return -1, err
+			if err := section.decodeKeyValue(buf); err != nil {
+				return err
 			}
-			// Skip those decoded bytes
-			buf.Next(n)
-
-			count += n
 
 		case msgListStart:
-			n, err := section.decodeList(buf.Bytes())
-			if err != nil {
-				return -1, err
+			if err := section.decodeList(buf); err != nil {
+				return err
 			}
-			// Skip those decoded bytes
-			buf.Next(n)
-
-			count += n
 
 		case msgSectionStart:
-			n, err := section.decodeSection(buf.Bytes())
-			if err != nil {
-				return -1, err
+			if err := section.decodeSection(buf); err != nil {
+				return err
 			}
-			// Skip those decoded bytes
-			buf.Next(n)
-
-			count += n
 
 		default:
-			return -1, errExpectedBeginning
+			return errExpectedBeginning
 		}
 
 		b, err = buf.ReadByte()
 		if err != nil {
-			return -1, fmt.Errorf("%v: %v", errDecoding, err)
+			return fmt.Errorf("%v: %v", errDecoding, err)
 		}
-
-		count++
 	}
 
 	if err := m.addItemUnique(key, section); err != nil {
-		return -1, err
+		return err
 	}
 
-	return count, nil
+	return nil
 }
 
 // messageTag is used for parsing struct tags in marshaling Messages
