@@ -451,6 +451,42 @@ func safePutUint32(buf *bytes.Buffer, val int) error {
 	return nil
 }
 
+func decodeKey(buf *bytes.Buffer) (string, error) {
+	// Read the key from the buffer
+	n, err := buf.ReadByte()
+	if err != nil {
+		return "", fmt.Errorf("%v: %v", errDecoding, err)
+	}
+	if n == 0 {
+		return "", fmt.Errorf("%v: key cannot be empty", errDecoding)
+	}
+
+	k := string(buf.Next(int(n)))
+	if len(k) != int(n) {
+		return "", errBadKey
+	}
+
+	return k, nil
+}
+
+func decodeValue(buf *bytes.Buffer) (string, error) {
+	// Read the value's length
+	n := buf.Next(2)
+	if len(n) != 2 {
+		return "", errEndOfBuffer
+	}
+
+	// Read the value from the buffer
+	vl := int(binary.BigEndian.Uint16(n))
+	v := string(buf.Next(vl))
+
+	if len(v) != vl {
+		return "", errBadValue
+	}
+
+	return v, nil
+}
+
 func (m *Message) encode() ([]byte, error) {
 	buf := bytes.NewBuffer([]byte{})
 
@@ -755,32 +791,14 @@ func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
 // decodeKeyValue will decode a key-value pair and write it to the message's
 // data.
 func (m *Message) decodeKeyValue(buf *bytes.Buffer) error {
-	// Read the key from the buffer
-	n, err := buf.ReadByte()
+	key, err := decodeKey(buf)
 	if err != nil {
-		return fmt.Errorf("%v: %v", errDecoding, err)
-	}
-	if n == 0 {
-		return fmt.Errorf("%v: key cannot be empty", errDecoding)
+		return err
 	}
 
-	keyLen := int(n)
-	key := string(buf.Next(keyLen))
-	if len(key) != keyLen {
-		return errBadKey
-	}
-
-	// Read the value's length
-	v := buf.Next(2)
-	if len(v) != 2 {
-		return errEndOfBuffer
-	}
-
-	// Read the value from the buffer
-	valueLen := int(binary.BigEndian.Uint16(v))
-	value := string(buf.Next(valueLen))
-	if len(value) != valueLen {
-		return errBadValue
+	value, err := decodeValue(buf)
+	if err != nil {
+		return err
 	}
 
 	if err := m.addItemUnique(key, value); err != nil {
@@ -794,19 +812,9 @@ func (m *Message) decodeKeyValue(buf *bytes.Buffer) error {
 func (m *Message) decodeList(buf *bytes.Buffer) error {
 	var list []string
 
-	// Read the key from the buffer
-	n, err := buf.ReadByte()
+	key, err := decodeKey(buf)
 	if err != nil {
-		return fmt.Errorf("%v: %v", errDecoding, err)
-	}
-	if n == 0 {
-		return fmt.Errorf("%v: key cannot be empty", errDecoding)
-	}
-
-	keyLen := int(n)
-	key := string(buf.Next(keyLen))
-	if len(key) != keyLen {
-		return errBadKey
+		return err
 	}
 
 	b, err := buf.ReadByte()
@@ -821,17 +829,9 @@ func (m *Message) decodeList(buf *bytes.Buffer) error {
 			return errExpectedBeginning
 		}
 
-		// Read the value's length
-		v := buf.Next(2)
-		if len(v) != 2 {
-			return errEndOfBuffer
-		}
-
-		// Read the value from the buffer
-		valueLen := int(binary.BigEndian.Uint16(v))
-		value := string(buf.Next(valueLen))
-		if len(value) != valueLen {
-			return errBadValue
+		value, err := decodeValue(buf)
+		if err != nil {
+			return err
 		}
 
 		list = append(list, value)
@@ -853,19 +853,9 @@ func (m *Message) decodeList(buf *bytes.Buffer) error {
 func (m *Message) decodeSection(buf *bytes.Buffer) error {
 	section := NewMessage()
 
-	// Read the key from the buffer
-	n, err := buf.ReadByte()
+	key, err := decodeKey(buf)
 	if err != nil {
-		return fmt.Errorf("%v: %v", errDecoding, err)
-	}
-	if n == 0 {
-		return fmt.Errorf("%v: key cannot be empty", errDecoding)
-	}
-
-	keyLen := int(n)
-	key := string(buf.Next(keyLen))
-	if len(key) != keyLen {
-		return errBadKey
+		return err
 	}
 
 	b, err := buf.ReadByte()
