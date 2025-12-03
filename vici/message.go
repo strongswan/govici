@@ -513,27 +513,20 @@ func (m *Message) encode() ([]byte, error) {
 	for k, v := range m.elements() {
 		rv := reflect.ValueOf(v)
 
-		var (
-			data []byte
-			err  error
-		)
-
 		switch rv.Kind() {
 		// In these cases, the variable 'uv' is short for
 		// 'underlying value.'
 		case reflect.String:
 			uv := v.(string)
 
-			data, err = m.encodeKeyValue(k, uv)
-			if err != nil {
+			if err := encodeKeyValue(buf, k, uv); err != nil {
 				return nil, err
 			}
 
 		case reflect.Slice, reflect.Array:
 			uv := v.([]string)
 
-			data, err = m.encodeList(k, uv)
-			if err != nil {
+			if err := encodeList(buf, k, uv); err != nil {
 				return nil, err
 			}
 
@@ -543,18 +536,12 @@ func (m *Message) encode() ([]byte, error) {
 				return nil, errUnsupportedType
 			}
 
-			data, err = m.encodeSection(k, uv)
-			if err != nil {
+			if err := encodeSection(buf, k, uv); err != nil {
 				return nil, err
 			}
 
 		default:
 			return nil, errUnsupportedType
-		}
-
-		_, err = buf.Write(data)
-		if err != nil {
-			return nil, fmt.Errorf("%v: %v", errEncoding, err)
 		}
 	}
 
@@ -627,165 +614,161 @@ func (m *Message) decode(data []byte) error {
 // The size of the byte slice is the length of the key and value, plus four bytes:
 // one byte for message element type, one byte for key length, and two bytes for value
 // length.
-func (m *Message) encodeKeyValue(key, value string) ([]byte, error) {
+func encodeKeyValue(buf *bytes.Buffer, key string, value string) error {
 	if key == "" {
-		return nil, fmt.Errorf("%v: cannot encode empty key", errEncoding)
+		return fmt.Errorf("%v: cannot encode empty key", errEncoding)
 	}
 
 	// Initialize buffer to indictate the message element type
 	// is a key-value pair
-	buf := bytes.NewBuffer([]byte{msgKeyValue})
+	if err := buf.WriteByte(msgKeyValue); err != nil {
+		return err
+	}
 
 	// Write the key length and key
 	if err := safePutUint8(buf, len(key)); err != nil {
-		return nil, fmt.Errorf("%v: %v", errEncoding, err)
+		return fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	_, err := buf.WriteString(key)
 	if err != nil {
-		return nil, fmt.Errorf("%v: %v", errEncoding, err)
+		return fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	// Write the value's length to the buffer as two bytes
 	if err := safePutUint16(buf, len(value)); err != nil {
-		return nil, fmt.Errorf("%v: %v", errEncoding, err)
+		return fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	// Write the value to the buffer
 	_, err = buf.WriteString(value)
 	if err != nil {
-		return nil, fmt.Errorf("%v: %v", errEncoding, err)
+		return fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
-	return buf.Bytes(), nil
+	return nil
 }
 
-// encodeList will return a byte slice of an encoded list.
+// encodeList will encode the list to the provided buffer.
 //
 // The size of the byte slice is the length of the key and total length of
 // the list (sum of length of the items in the list), plus three bytes for each
 // list item: one for message element type, and two for item length. Another three
 // bytes are used to indicate list start and list stop, and the length of the key.
-func (m *Message) encodeList(key string, list []string) ([]byte, error) {
+func encodeList(buf *bytes.Buffer, key string, list []string) error {
 	if key == "" {
-		return nil, fmt.Errorf("%v: cannot encode empty key", errEncoding)
+		return fmt.Errorf("%v: cannot encode empty key", errEncoding)
 	}
 
 	// Initialize buffer to indictate the message element type
 	// is the start of a list
-	buf := bytes.NewBuffer([]byte{msgListStart})
+	if err := buf.WriteByte(msgListStart); err != nil {
+		return err
+	}
 
 	// Write the key length and key
 	err := safePutUint8(buf, len(key))
 	if err != nil {
-		return nil, fmt.Errorf("%v: %v", errEncoding, err)
+		return fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	_, err = buf.WriteString(key)
 	if err != nil {
-		return nil, fmt.Errorf("%v: %v", errEncoding, err)
+		return fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	for _, item := range list {
 		// Indicate that this is a list item
 		err = buf.WriteByte(msgListItem)
 		if err != nil {
-			return nil, fmt.Errorf("%v: %v", errEncoding, err)
+			return fmt.Errorf("%v: %v", errEncoding, err)
 		}
 
 		// Write the item's length to the buffer as two bytes
 		if err := safePutUint16(buf, len(item)); err != nil {
-			return nil, fmt.Errorf("%v: %v", errEncoding, err)
+			return fmt.Errorf("%v: %v", errEncoding, err)
 		}
 
 		// Write the item to the buffer
 		_, err = buf.WriteString(item)
 		if err != nil {
-			return nil, fmt.Errorf("%v: %v", errEncoding, err)
+			return fmt.Errorf("%v: %v", errEncoding, err)
 		}
 	}
 
 	// Indicate the end of the list
 	err = buf.WriteByte(msgListEnd)
 	if err != nil {
-		return nil, fmt.Errorf("%v: %v", errEncoding, err)
+		return fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
-	return buf.Bytes(), nil
+	return nil
 }
 
-// encodeSection will return a byte slice of an encoded section
-func (m *Message) encodeSection(key string, section *Message) ([]byte, error) {
+// encodeSection will encode the section to the given buffer.
+func encodeSection(buf *bytes.Buffer, key string, section *Message) error {
 	if key == "" {
-		return nil, fmt.Errorf("%v: cannot encode empty key", errEncoding)
+		return fmt.Errorf("%v: cannot encode empty key", errEncoding)
 	}
 
 	// Initialize buffer to indictate the message element type
 	// is the start of a section
-	buf := bytes.NewBuffer([]byte{msgSectionStart})
+	if err := buf.WriteByte(msgSectionStart); err != nil {
+		return err
+	}
 
 	// Write the key length and key
 	err := safePutUint8(buf, len(key))
 	if err != nil {
-		return nil, fmt.Errorf("%v: %v", errEncoding, err)
+		return fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	_, err = buf.WriteString(key)
 	if err != nil {
-		return nil, fmt.Errorf("%v: %v", errEncoding, err)
+		return fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
 	// Encode the sections elements
 	for k, v := range section.elements() {
 		rv := reflect.ValueOf(v)
 
-		var data []byte
-
 		switch rv.Kind() {
 		case reflect.String:
 			uv := v.(string)
 
-			data, err = m.encodeKeyValue(k, uv)
-			if err != nil {
-				return nil, err
+			if err := encodeKeyValue(buf, k, uv); err != nil {
+				return err
 			}
 
 		case reflect.Slice, reflect.Array:
 			uv := v.([]string)
 
-			data, err = m.encodeList(k, uv)
-			if err != nil {
-				return nil, err
+			if err := encodeList(buf, k, uv); err != nil {
+				return err
 			}
 
 		case reflect.Ptr:
 			uv, ok := v.(*Message)
 			if !ok {
-				return nil, errUnsupportedType
+				return errUnsupportedType
 			}
 
-			data, err = m.encodeSection(k, uv)
-			if err != nil {
-				return nil, err
+			if err := encodeSection(buf, k, uv); err != nil {
+				return err
 			}
 
 		default:
-			return nil, errUnsupportedType
-		}
-
-		_, err = buf.Write(data)
-		if err != nil {
-			return nil, fmt.Errorf("%v: %v", errEncoding, err)
+			return errUnsupportedType
 		}
 	}
 
 	// Indicate the end of the section
 	err = buf.WriteByte(msgSectionEnd)
 	if err != nil {
-		return nil, fmt.Errorf("%v: %v", errEncoding, err)
+		return fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
-	return buf.Bytes(), nil
+	return nil
 }
 
 // decodeKeyValue will decode a key-value pair and write it to the message's
