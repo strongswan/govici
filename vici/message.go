@@ -535,26 +535,8 @@ func (m *Message) encode() ([]byte, error) {
 		}
 	}
 
-	for k, v := range m.elements() {
-		switch v := v.(type) {
-		case string:
-			if err := encodeKeyValue(buf, k, v); err != nil {
-				return nil, err
-			}
-
-		case []string:
-			if err := encodeList(buf, k, v); err != nil {
-				return nil, err
-			}
-
-		case *Message:
-			if err := encodeSection(buf, k, v); err != nil {
-				return nil, err
-			}
-
-		default:
-			return nil, errUnsupportedType
-		}
+	if err := m.encodeElements(buf); err != nil {
+		return nil, err
 	}
 
 	return buf.Bytes(), nil
@@ -615,6 +597,34 @@ func (m *Message) decode(data []byte) error {
 			}
 		default:
 			return fmt.Errorf("%v: invalid byte %v looking for next element type", errDecoding, b)
+		}
+	}
+
+	return nil
+}
+
+// encodeElements encodes all of the message elements to the buffer.
+func (m *Message) encodeElements(buf *bytes.Buffer) error {
+	for k, v := range m.elements() {
+		switch v := v.(type) {
+		case string:
+			if err := encodeKeyValue(buf, k, v); err != nil {
+				return err
+			}
+
+		case []string:
+			if err := encodeList(buf, k, v); err != nil {
+				return err
+			}
+
+		case *Message:
+			if err := encodeSection(buf, k, v); err != nil {
+				return err
+			}
+
+		default:
+			// This should never happen.
+			return errUnsupportedType
 		}
 	}
 
@@ -692,27 +702,8 @@ func encodeSection(buf *bytes.Buffer, key string, section *Message) error {
 		return err
 	}
 
-	// Encode the sections elements
-	for k, v := range section.elements() {
-		switch v := v.(type) {
-		case string:
-			if err := encodeKeyValue(buf, k, v); err != nil {
-				return err
-			}
-
-		case []string:
-			if err := encodeList(buf, k, v); err != nil {
-				return err
-			}
-
-		case *Message:
-			if err := encodeSection(buf, k, v); err != nil {
-				return err
-			}
-
-		default:
-			return errUnsupportedType
-		}
+	if err := section.encodeElements(buf); err != nil {
+		return err
 	}
 
 	// Indicate the end of the section
