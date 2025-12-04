@@ -536,32 +536,19 @@ func (m *Message) encode() ([]byte, error) {
 	}
 
 	for k, v := range m.elements() {
-		rv := reflect.ValueOf(v)
-
-		switch rv.Kind() {
-		// In these cases, the variable 'uv' is short for
-		// 'underlying value.'
-		case reflect.String:
-			uv := v.(string)
-
-			if err := encodeKeyValue(buf, k, uv); err != nil {
+		switch v := v.(type) {
+		case string:
+			if err := encodeKeyValue(buf, k, v); err != nil {
 				return nil, err
 			}
 
-		case reflect.Slice, reflect.Array:
-			uv := v.([]string)
-
-			if err := encodeList(buf, k, uv); err != nil {
+		case []string:
+			if err := encodeList(buf, k, v); err != nil {
 				return nil, err
 			}
 
-		case reflect.Ptr:
-			uv, ok := v.(*Message)
-			if !ok {
-				return nil, errUnsupportedType
-			}
-
-			if err := encodeSection(buf, k, uv); err != nil {
+		case *Message:
+			if err := encodeSection(buf, k, v); err != nil {
 				return nil, err
 			}
 
@@ -707,30 +694,19 @@ func encodeSection(buf *bytes.Buffer, key string, section *Message) error {
 
 	// Encode the sections elements
 	for k, v := range section.elements() {
-		rv := reflect.ValueOf(v)
-
-		switch rv.Kind() {
-		case reflect.String:
-			uv := v.(string)
-
-			if err := encodeKeyValue(buf, k, uv); err != nil {
+		switch v := v.(type) {
+		case string:
+			if err := encodeKeyValue(buf, k, v); err != nil {
 				return err
 			}
 
-		case reflect.Slice, reflect.Array:
-			uv := v.([]string)
-
-			if err := encodeList(buf, k, uv); err != nil {
+		case []string:
+			if err := encodeList(buf, k, v); err != nil {
 				return err
 			}
 
-		case reflect.Ptr:
-			uv, ok := v.(*Message)
-			if !ok {
-				return errUnsupportedType
-			}
-
-			if err := encodeSection(buf, k, uv); err != nil {
+		case *Message:
+			if err := encodeSection(buf, k, v); err != nil {
 				return err
 			}
 
