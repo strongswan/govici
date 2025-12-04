@@ -487,6 +487,37 @@ func decodeValue(buf *bytes.Buffer) (string, error) {
 	return v, nil
 }
 
+func encodeKey(buf *bytes.Buffer, key string) error {
+	if key == "" {
+		return fmt.Errorf("%v: cannot encode empty key", errEncoding)
+	}
+
+	// Write the key length and key
+	if err := safePutUint8(buf, len(key)); err != nil {
+		return fmt.Errorf("%v: %v", errEncoding, err)
+	}
+
+	if _, err := buf.WriteString(key); err != nil {
+		return fmt.Errorf("%v: %v", errEncoding, err)
+	}
+
+	return nil
+}
+
+func encodeValue(buf *bytes.Buffer, value string) error {
+	// Write the value's length to the buffer as two bytes
+	if err := safePutUint16(buf, len(value)); err != nil {
+		return fmt.Errorf("%v: %v", errEncoding, err)
+	}
+
+	// Write the value to the buffer
+	if _, err := buf.WriteString(value); err != nil {
+		return fmt.Errorf("%v: %v", errEncoding, err)
+	}
+
+	return nil
+}
+
 func (m *Message) encode() ([]byte, error) {
 	buf := bytes.NewBuffer([]byte{})
 
@@ -499,14 +530,8 @@ func (m *Message) encode() ([]byte, error) {
 	}
 
 	if m.packetIsNamed() {
-		err := safePutUint8(buf, len(m.header.name))
-		if err != nil {
-			return nil, fmt.Errorf("%v: %v", errEncoding, err)
-		}
-
-		_, err = buf.WriteString(m.header.name)
-		if err != nil {
-			return nil, fmt.Errorf("%v: %v", errEncoding, err)
+		if err := encodeKey(buf, m.header.name); err != nil {
+			return nil, err
 		}
 	}
 
@@ -615,35 +640,18 @@ func (m *Message) decode(data []byte) error {
 // one byte for message element type, one byte for key length, and two bytes for value
 // length.
 func encodeKeyValue(buf *bytes.Buffer, key string, value string) error {
-	if key == "" {
-		return fmt.Errorf("%v: cannot encode empty key", errEncoding)
-	}
-
 	// Initialize buffer to indictate the message element type
 	// is a key-value pair
 	if err := buf.WriteByte(msgKeyValue); err != nil {
 		return err
 	}
 
-	// Write the key length and key
-	if err := safePutUint8(buf, len(key)); err != nil {
-		return fmt.Errorf("%v: %v", errEncoding, err)
+	if err := encodeKey(buf, key); err != nil {
+		return err
 	}
 
-	_, err := buf.WriteString(key)
-	if err != nil {
-		return fmt.Errorf("%v: %v", errEncoding, err)
-	}
-
-	// Write the value's length to the buffer as two bytes
-	if err := safePutUint16(buf, len(value)); err != nil {
-		return fmt.Errorf("%v: %v", errEncoding, err)
-	}
-
-	// Write the value to the buffer
-	_, err = buf.WriteString(value)
-	if err != nil {
-		return fmt.Errorf("%v: %v", errEncoding, err)
+	if err := encodeValue(buf, value); err != nil {
+		return err
 	}
 
 	return nil
@@ -656,49 +664,29 @@ func encodeKeyValue(buf *bytes.Buffer, key string, value string) error {
 // list item: one for message element type, and two for item length. Another three
 // bytes are used to indicate list start and list stop, and the length of the key.
 func encodeList(buf *bytes.Buffer, key string, list []string) error {
-	if key == "" {
-		return fmt.Errorf("%v: cannot encode empty key", errEncoding)
-	}
-
 	// Initialize buffer to indictate the message element type
 	// is the start of a list
 	if err := buf.WriteByte(msgListStart); err != nil {
 		return err
 	}
 
-	// Write the key length and key
-	err := safePutUint8(buf, len(key))
-	if err != nil {
-		return fmt.Errorf("%v: %v", errEncoding, err)
-	}
-
-	_, err = buf.WriteString(key)
-	if err != nil {
-		return fmt.Errorf("%v: %v", errEncoding, err)
+	if err := encodeKey(buf, key); err != nil {
+		return err
 	}
 
 	for _, item := range list {
 		// Indicate that this is a list item
-		err = buf.WriteByte(msgListItem)
-		if err != nil {
+		if err := buf.WriteByte(msgListItem); err != nil {
 			return fmt.Errorf("%v: %v", errEncoding, err)
 		}
 
-		// Write the item's length to the buffer as two bytes
-		if err := safePutUint16(buf, len(item)); err != nil {
-			return fmt.Errorf("%v: %v", errEncoding, err)
-		}
-
-		// Write the item to the buffer
-		_, err = buf.WriteString(item)
-		if err != nil {
-			return fmt.Errorf("%v: %v", errEncoding, err)
+		if err := encodeValue(buf, item); err != nil {
+			return err
 		}
 	}
 
 	// Indicate the end of the list
-	err = buf.WriteByte(msgListEnd)
-	if err != nil {
+	if err := buf.WriteByte(msgListEnd); err != nil {
 		return fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
@@ -707,25 +695,14 @@ func encodeList(buf *bytes.Buffer, key string, list []string) error {
 
 // encodeSection will encode the section to the given buffer.
 func encodeSection(buf *bytes.Buffer, key string, section *Message) error {
-	if key == "" {
-		return fmt.Errorf("%v: cannot encode empty key", errEncoding)
-	}
-
 	// Initialize buffer to indictate the message element type
 	// is the start of a section
 	if err := buf.WriteByte(msgSectionStart); err != nil {
 		return err
 	}
 
-	// Write the key length and key
-	err := safePutUint8(buf, len(key))
-	if err != nil {
-		return fmt.Errorf("%v: %v", errEncoding, err)
-	}
-
-	_, err = buf.WriteString(key)
-	if err != nil {
-		return fmt.Errorf("%v: %v", errEncoding, err)
+	if err := encodeKey(buf, key); err != nil {
+		return err
 	}
 
 	// Encode the sections elements
@@ -763,8 +740,7 @@ func encodeSection(buf *bytes.Buffer, key string, section *Message) error {
 	}
 
 	// Indicate the end of the section
-	err = buf.WriteByte(msgSectionEnd)
-	if err != nil {
+	if err := buf.WriteByte(msgSectionEnd); err != nil {
 		return fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
