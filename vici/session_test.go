@@ -540,7 +540,7 @@ func TestNotifyEventsMulti(t *testing.T) {
 		evs[i] = <-ecs[i]
 	}
 
-	if !(evs[0].Timestamp.Equal(evs[1].Timestamp) && evs[1].Timestamp.Equal(evs[2].Timestamp)) {
+	if !evs[0].Timestamp.Equal(evs[1].Timestamp) || !evs[1].Timestamp.Equal(evs[2].Timestamp) {
 		t.Fatal("Received different events on multiple chans")
 	}
 }
