@@ -98,7 +98,6 @@ var (
 	errMalformedMessage = errors.New("vici: malformed message")
 
 	// Malformed message errors
-	errBadName           = fmt.Errorf("%v: expected name length does not match actual length", errDecoding)
 	errBadKey            = fmt.Errorf("%v: expected key length does not match actual length", errMalformedMessage)
 	errBadValue          = fmt.Errorf("%v: expected value length does not match actual length", errMalformedMessage)
 	errEndOfBuffer       = fmt.Errorf("%v: unexpected end of buffer", errMalformedMessage)
@@ -557,20 +556,11 @@ func (m *Message) decode(data []byte) error {
 	m.header.ptype = b
 
 	if m.packetIsNamed() {
-		l, err := buf.ReadByte()
+		name, err := decodeKey(buf)
 		if err != nil {
-			return fmt.Errorf("%v: %v", errDecoding, err)
+			return err
 		}
-		if l == 0 {
-			return fmt.Errorf("%v: named packet does not have valid name", errDecoding)
-		}
-
-		name := buf.Next(int(l))
-		if len(name) != int(l) {
-			return errBadName
-		}
-
-		m.header.name = string(name)
+		m.header.name = name
 	}
 
 	for buf.Len() > 0 {
