@@ -27,6 +27,7 @@ import (
 	"fmt"
 	"io"
 	"iter"
+	"net"
 	"reflect"
 	"strconv"
 	"strings"
@@ -812,6 +813,49 @@ func (m *Message) decodeSection(buf *bytes.Buffer) error {
 	}
 
 	return nil
+}
+
+// sendmsg is a helper to write a message to a given net.Conn.
+func sendmsg(conn net.Conn, p *Message) error {
+	b, err := p.encode()
+	if err != nil {
+		return err
+	}
+
+	// The packet length must fit in four bytes.
+	if uint64(len(b)) > uint64(^uint32(0)) {
+		return fmt.Errorf("packet length (%d) exceeds 4 bytes", len(b))
+	}
+
+	raw := make([]byte, 4)
+	binary.BigEndian.PutUint32(raw, uint32(len(b))) // #nosec G115
+	raw = append(raw, b...)
+
+	if _, err := conn.Write(raw); err != nil {
+		return err
+	}
+
+	return nil
+}
+
+// readmsg is a helper to read a message from a given net.Conn.
+func readmsg(conn net.Conn) (*Message, error) {
+	raw := make([]byte, 4 /* header length */)
+	if _, err := io.ReadFull(conn, raw); err != nil {
+		return nil, err
+	}
+
+	raw = make([]byte, binary.BigEndian.Uint32(raw))
+	if _, err := io.ReadFull(conn, raw); err != nil {
+		return nil, err
+	}
+
+	p := NewMessage()
+	if err := p.decode(raw); err != nil {
+		return nil, err
+	}
+
+	return p, nil
 }
 
 // messageTag is used for parsing struct tags in marshaling Messages

@@ -53,52 +53,6 @@ func newTestServer(conn net.Conn) *testServer {
 	return ts
 }
 
-func (ts *testServer) read() (*Message, error) {
-	p := NewMessage()
-
-	buf := make([]byte, 4 /* header length */)
-	_, err := io.ReadFull(ts.conn, buf)
-	if err != nil {
-		return nil, err
-	}
-	pl := binary.BigEndian.Uint32(buf)
-
-	buf = make([]byte, int(pl))
-	_, err = io.ReadFull(ts.conn, buf)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := p.decode(buf); err != nil {
-		return nil, err
-	}
-
-	return p, nil
-}
-
-func (ts *testServer) write(p *Message) error {
-	buf := bytes.NewBuffer([]byte{})
-
-	b, err := p.encode()
-	if err != nil {
-		return err
-	}
-
-	// Write the packet length
-	if err := safePutUint32(buf, len(b)); err != nil {
-		return err
-	}
-
-	// Write the payload
-	_, err = buf.Write(b)
-	if err != nil {
-		return err
-	}
-	_, err = ts.conn.Write(buf.Bytes())
-
-	return err
-}
-
 func (ts *testServer) commandHandlerOK(_ *Message) (*Message, error) {
 	resp := &Message{
 		header: &header{
@@ -257,7 +211,7 @@ func (ts *testServer) eventRegisterHandlerSimple(p *Message) (*Message, error) {
 				panic(err)
 			}
 
-			if err := ts.write(ev); err != nil {
+			if err := sendmsg(ts.conn, ev); err != nil {
 				panic(err)
 			}
 		}
@@ -299,7 +253,7 @@ func (ts *testServer) eventRegisterHandlerStream(p *Message) (*Message, error) {
 				panic(err)
 			}
 
-			if err := ts.write(ev); err != nil {
+			if err := sendmsg(ts.conn, ev); err != nil {
 				panic(err)
 			}
 		}
@@ -336,7 +290,7 @@ func (ts *testServer) serve() {
 			resp *Message
 		)
 
-		p, err := ts.read()
+		p, err := readmsg(ts.conn)
 		if err != nil {
 			if errors.Is(err, io.ErrClosedPipe) {
 				return
@@ -378,7 +332,7 @@ func (ts *testServer) serve() {
 				}
 			}
 
-			if err := ts.write(resp); err != nil {
+			if err := sendmsg(ts.conn, resp); err != nil {
 				panic(err)
 			}
 		}()
@@ -496,7 +450,7 @@ func TestClientConnRead(t *testing.T) {
 
 		cc := newClientConn(client)
 
-		p, err := cc.read()
+		p, err := readmsg(cc.conn)
 		if err != nil {
 			t.Errorf("Unexpected error receiving packet: %v", err)
 			return

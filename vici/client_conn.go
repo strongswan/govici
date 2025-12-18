@@ -21,9 +21,7 @@
 package vici
 
 import (
-	"bytes"
 	"context"
-	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -105,7 +103,7 @@ func (cc *clientConn) listen() {
 	defer cc.stop()
 
 	for {
-		p, err := cc.read()
+		p, err := readmsg(cc.conn)
 		if err != nil {
 			cc.err <- err
 			return
@@ -163,29 +161,6 @@ func (cc *clientConn) stop() {
 	}
 }
 
-func (cc *clientConn) read() (*Message, error) {
-	p := NewMessage()
-
-	buf := make([]byte, 4 /* header length */)
-	_, err := io.ReadFull(cc.conn, buf)
-	if err != nil {
-		return nil, err
-	}
-	pl := binary.BigEndian.Uint32(buf)
-
-	buf = make([]byte, int(pl))
-	_, err = io.ReadFull(cc.conn, buf)
-	if err != nil {
-		return nil, err
-	}
-
-	if err := p.decode(buf); err != nil {
-		return nil, err
-	}
-
-	return p, nil
-}
-
 func (cc *clientConn) write(ctx context.Context, p *Message) error {
 	if ctx == nil {
 		return errors.New("context cannot be nil")
@@ -203,24 +178,6 @@ func (cc *clientConn) write(ctx context.Context, p *Message) error {
 		return fmt.Errorf("invalid request with packet type %v", p.header.ptype)
 	}
 
-	buf := bytes.NewBuffer([]byte{})
-
-	b, err := p.encode()
-	if err != nil {
-		return err
-	}
-
-	// Write the packet length
-	if err := safePutUint32(buf, len(b)); err != nil {
-		return err
-	}
-
-	// Write the payload
-	_, err = buf.Write(b)
-	if err != nil {
-		return err
-	}
-
 	// Reset the write deadline in case a previous write was cancelled.
 	if err := cc.conn.SetWriteDeadline(time.Time{}); err != nil {
 		return err
@@ -230,8 +187,7 @@ func (cc *clientConn) write(ctx context.Context, p *Message) error {
 	go func() {
 		defer close(rc)
 
-		_, err = cc.conn.Write(buf.Bytes())
-		rc <- err
+		rc <- sendmsg(cc.conn, p)
 	}()
 
 	select {
