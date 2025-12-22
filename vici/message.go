@@ -502,24 +502,25 @@ func (m *Message) encode() ([]byte, error) {
 	return buf.Bytes(), nil
 }
 
-func (m *Message) decode(data []byte) error {
+func decode(data []byte) (*Message, error) {
+	m := NewMessage()
 	m.header = &header{}
 	buf := bytes.NewBuffer(data)
 
 	// Parse the message header first.
 	b, err := buf.ReadByte()
 	if err != nil {
-		return fmt.Errorf("%v: %v", errDecoding, err)
+		return nil, fmt.Errorf("%v: %v", errDecoding, err)
 	}
 	if b >= pktInvalid {
-		return fmt.Errorf("%v: invalid packet type %v", errDecoding, b)
+		return nil, fmt.Errorf("%v: invalid packet type %v", errDecoding, b)
 	}
 	m.header.ptype = b
 
 	if m.packetIsNamed() {
 		name, err := decodeKey(buf)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		m.header.name = name
 	}
@@ -527,31 +528,37 @@ func (m *Message) decode(data []byte) error {
 	for buf.Len() > 0 {
 		b, err = buf.ReadByte()
 		if err != nil && err != io.EOF {
-			return fmt.Errorf("%v: %v", errDecoding, err)
+			return nil, fmt.Errorf("%v: %v", errDecoding, err)
 		}
 
+		var (
+			key   string
+			value any
+			err   error
+		)
 		// Determine the next message element
 		switch b {
 		case msgKeyValue:
-			if err := m.decodeKeyValue(buf); err != nil {
-				return err
-			}
+			key, value, err = decodeKeyValue(buf)
 
 		case msgListStart:
-			if err := m.decodeList(buf); err != nil {
-				return err
-			}
+			key, value, err = decodeList(buf)
 
 		case msgSectionStart:
-			if err := m.decodeSection(buf); err != nil {
-				return err
-			}
+			key, value, err = decodeSection(buf)
+
 		default:
-			return fmt.Errorf("%v: invalid byte %v looking for next element type", errDecoding, b)
+			return nil, errExpectedBeginning
+		}
+		if err != nil {
+			return nil, err
+		}
+		if err := m.addItemUnique(key, value); err != nil {
+			return nil, err
 		}
 	}
 
-	return nil
+	return m, nil
 }
 
 // encodeElements encodes all of the message elements to the buffer.
@@ -665,114 +672,106 @@ func encodeSection(buf *bytes.Buffer, key string, section *Message) error {
 	return nil
 }
 
-// decodeKeyValue will decode a key-value pair and write it to the message's
-// data.
-func (m *Message) decodeKeyValue(buf *bytes.Buffer) error {
+// decodeKeyValue will decode a key-value pair from the buffer
+func decodeKeyValue(buf *bytes.Buffer) (string, string, error) {
 	key, err := decodeKey(buf)
 	if err != nil {
-		return err
+		return "", "", err
 	}
 
 	value, err := decodeValue(buf)
 	if err != nil {
-		return err
+		return "", "", err
 	}
 
-	if err := m.addItemUnique(key, value); err != nil {
-		return fmt.Errorf("%v: %v", errDecoding, err)
-	}
-
-	return nil
+	return key, value, nil
 }
 
-// decodeList will decode a list and write it to the message's data.
-func (m *Message) decodeList(buf *bytes.Buffer) error {
+// decodeList will decode a list from the buffer
+func decodeList(buf *bytes.Buffer) (string, []string, error) {
 	var list []string
 
 	key, err := decodeKey(buf)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 
 	b, err := buf.ReadByte()
 	if err != nil {
-		return fmt.Errorf("%v: %v", errDecoding, err)
+		return "", nil, fmt.Errorf("%v: %v", errDecoding, err)
 	}
 
 	// Read the list from the buffer
 	for b != msgListEnd {
 		// Ensure this is the beginning of a list item
 		if b != msgListItem {
-			return errExpectedBeginning
+			return "", nil, errExpectedBeginning
 		}
 
 		value, err := decodeValue(buf)
 		if err != nil {
-			return err
+			return "", nil, err
 		}
 
 		list = append(list, value)
 
 		b, err = buf.ReadByte()
 		if err != nil {
-			return fmt.Errorf("%v: %v", errDecoding, err)
+			return "", nil, fmt.Errorf("%v: %v", errDecoding, err)
 		}
 	}
 
-	if err := m.addItemUnique(key, list); err != nil {
-		return fmt.Errorf("%v: %v", errDecoding, err)
-	}
-
-	return nil
+	return key, list, nil
 }
 
-// decodeSection will decode a section into a message's data.
-func (m *Message) decodeSection(buf *bytes.Buffer) error {
+// decodeSection will decode a section from the buffer
+func decodeSection(buf *bytes.Buffer) (string, *Message, error) {
 	section := NewMessage()
 
 	key, err := decodeKey(buf)
 	if err != nil {
-		return err
+		return "", nil, err
 	}
 
 	b, err := buf.ReadByte()
 	if err != nil {
-		return fmt.Errorf("%v: %v", errDecoding, err)
+		return "", nil, fmt.Errorf("%v: %v", errDecoding, err)
 	}
 
 	for b != msgSectionEnd {
+		var (
+			key   string
+			value any
+			err   error
+		)
 		// Determine the next message element
 		switch b {
 		case msgKeyValue:
-			if err := section.decodeKeyValue(buf); err != nil {
-				return err
-			}
+			key, value, err = decodeKeyValue(buf)
 
 		case msgListStart:
-			if err := section.decodeList(buf); err != nil {
-				return err
-			}
+			key, value, err = decodeList(buf)
 
 		case msgSectionStart:
-			if err := section.decodeSection(buf); err != nil {
-				return err
-			}
+			key, value, err = decodeSection(buf)
 
 		default:
-			return errExpectedBeginning
+			return "", nil, errExpectedBeginning
+		}
+		if err != nil {
+			return "", nil, err
+		}
+		if err := section.addItemUnique(key, value); err != nil {
+			return "", nil, err
 		}
 
 		b, err = buf.ReadByte()
 		if err != nil {
-			return fmt.Errorf("%v: %v", errDecoding, err)
+			return "", nil, fmt.Errorf("%v: %v", errDecoding, err)
 		}
 	}
 
-	if err := m.addItemUnique(key, section); err != nil {
-		return err
-	}
-
-	return nil
+	return key, section, nil
 }
 
 // sendmsg is a helper to write a message to a given net.Conn.
@@ -810,12 +809,7 @@ func readmsg(conn net.Conn) (*Message, error) {
 		return nil, err
 	}
 
-	p := NewMessage()
-	if err := p.decode(raw); err != nil {
-		return nil, err
-	}
-
-	return p, nil
+	return decode(raw)
 }
 
 // messageTag is used for parsing struct tags in marshaling Messages

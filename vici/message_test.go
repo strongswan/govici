@@ -175,9 +175,8 @@ var (
 )
 
 func TestPacketParse(t *testing.T) {
-	m := NewMessage()
-
-	if err := m.decode(goldNamedPacketBytes); err != nil {
+	m, err := decode(goldNamedPacketBytes)
+	if err != nil {
 		t.Fatalf("Error parsing packet: %v", err)
 	}
 
@@ -185,9 +184,8 @@ func TestPacketParse(t *testing.T) {
 		t.Fatalf("Parsed named packet does not equal gold packet.\nExpected: %v\nReceived: %v", goldNamedPacket, m)
 	}
 
-	m = NewMessage()
-
-	if err := m.decode(goldUnnamedPacketBytes); err != nil {
+	m, err = decode(goldUnnamedPacketBytes)
+	if err != nil {
 		t.Fatalf("Error parsing packet: %v", err)
 	}
 
@@ -299,8 +297,7 @@ func TestMessageEncode(t *testing.T) {
 }
 
 func TestMessageDecode(t *testing.T) {
-	m := NewMessage()
-	err := m.decode(goldMessageBytes)
+	m, err := decode(goldMessageBytes)
 	if err != nil {
 		t.Fatalf("Error decoding test bytes: %v", err)
 	}
@@ -858,9 +855,8 @@ func FuzzEncodeDecode(f *testing.F) {
 	}
 
 	f.Fuzz(func(t *testing.T, data []byte) {
-		m := NewMessage()
-
-		if err := m.decode(data); err != nil {
+		m, err := decode(data)
+		if err != nil {
 			return
 		}
 
