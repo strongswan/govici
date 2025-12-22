@@ -236,6 +236,40 @@ func TestPacketTooLong(t *testing.T) {
 	}
 }
 
+func TestEncodingLimits(t *testing.T) {
+	buf := new(bytes.Buffer)
+
+	maxKey := make([]byte, ^uint8(0))
+	for i := range maxKey {
+		maxKey[i] = 'a'
+	}
+	if err := encodeKey(buf, string(maxKey)); err != nil {
+		t.Fatalf("Unexpected error encoding %s (%d)", maxKey, len(maxKey))
+	}
+	longKey := make([]byte, len(maxKey)+1)
+	for i := range longKey {
+		longKey[i] = 'a'
+	}
+	if err := encodeKey(buf, string(longKey)); err == nil {
+		t.Fatalf("Expected key-too-long error due to %s (%d)", longKey, len(longKey))
+	}
+
+	maxValue := make([]byte, ^uint16(0))
+	for i := range maxValue {
+		maxValue[i] = 'a'
+	}
+	if err := encodeValue(buf, string(maxValue)); err != nil {
+		t.Fatalf("Unexpected error encoding %s (%d)", maxValue, len(maxValue))
+	}
+	longValue := make([]byte, len(maxValue)+1)
+	for i := range longValue {
+		longValue[i] = 'a'
+	}
+	if err := encodeValue(buf, string(longValue)); err == nil {
+		t.Fatalf("Expected value-too-long error due to %s (%d)", longValue, len(longValue))
+	}
+}
+
 type testMessage struct {
 	Key      string       `vici:"key"`
 	Empty    string       `vici:"empty"`

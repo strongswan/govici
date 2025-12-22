@@ -399,58 +399,6 @@ func (m *Message) elements() iter.Seq2[string, any] {
 	}
 }
 
-func safePutUint8(buf *bytes.Buffer, val int) error {
-	limit := ^uint8(0)
-
-	if int64(val) > int64(limit) {
-		return fmt.Errorf("val too long (%d > %d)", val, limit)
-	}
-
-	// We can safely convert now, because we just checked that it will not overflow.
-	// #nosec G115
-	if err := buf.WriteByte(uint8(val)); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func safePutUint16(buf *bytes.Buffer, val int) error {
-	limit := ^uint16(0)
-	b := make([]byte, 2)
-
-	if int64(val) > int64(limit) {
-		return fmt.Errorf("val too long (%d > %d)", val, limit)
-	}
-
-	// We can safely convert now, because we just checked that it will not overflow.
-	binary.BigEndian.PutUint16(b, uint16(val)) // #nosec G115
-
-	if _, err := buf.Write(b); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func safePutUint32(buf *bytes.Buffer, val int) error {
-	limit := ^uint32(0)
-	b := make([]byte, 4)
-
-	if int64(val) > int64(limit) {
-		return fmt.Errorf("val too long (%d > %d)", val, limit)
-	}
-
-	// We can safely convert now, because we just checked that it will not overflow.
-	binary.BigEndian.PutUint32(b, uint32(val)) // #nosec G115
-
-	if _, err := buf.Write(b); err != nil {
-		return err
-	}
-
-	return nil
-}
-
 func decodeKey(buf *bytes.Buffer) (string, error) {
 	// Read the key from the buffer
 	n, err := buf.ReadByte()
@@ -492,9 +440,15 @@ func encodeKey(buf *bytes.Buffer, key string) error {
 		return fmt.Errorf("%v: cannot encode empty key", errEncoding)
 	}
 
-	// Write the key length and key
-	if err := safePutUint8(buf, len(key)); err != nil {
-		return fmt.Errorf("%v: %v", errEncoding, err)
+	// Write the key length and key. The packet length
+	// must fit in one byte.
+	if uint64(len(key)) > uint64(^uint8(0)) {
+		return fmt.Errorf("packet length (%d) exceeds 1 byte", len(key))
+	}
+
+	// #nosec G115
+	if err := buf.WriteByte(uint8(len(key))); err != nil {
+		return err
 	}
 
 	if _, err := buf.WriteString(key); err != nil {
@@ -505,9 +459,15 @@ func encodeKey(buf *bytes.Buffer, key string) error {
 }
 
 func encodeValue(buf *bytes.Buffer, value string) error {
-	// Write the value's length to the buffer as two bytes
-	if err := safePutUint16(buf, len(value)); err != nil {
-		return fmt.Errorf("%v: %v", errEncoding, err)
+	// The packet length must fit in two bytes.
+	if uint64(len(value)) > uint64(^uint16(0)) {
+		return fmt.Errorf("packet length (%d) exceeds 2 bytes", len(value))
+	}
+	vl := make([]byte, 2)
+	binary.BigEndian.PutUint16(vl, uint16(len(value))) // #nosec G115
+
+	if _, err := buf.Write(vl); err != nil {
+		return err
 	}
 
 	// Write the value to the buffer

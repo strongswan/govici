@@ -427,11 +427,9 @@ func TestClientConnRead(t *testing.T) {
 		defer wg.Done()
 
 		// Make a buffer big enough for the data and the header.
-		buf := new(bytes.Buffer)
-		if err := safePutUint32(buf, len(goldUnnamedPacketBytes)); err != nil {
-			t.Errorf("Unexpected error writing header: %v", err)
-			return
-		}
+		raw := make([]byte, 4)
+		binary.BigEndian.PutUint32(raw, uint32(len(goldUnnamedPacketBytes))) // #nosec G115
+		buf := bytes.NewBuffer(raw)
 
 		if _, err := buf.Write(goldUnnamedPacketBytes); err != nil {
 			t.Errorf("Unexpected error writing packet: %v", err)
