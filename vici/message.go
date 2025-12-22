@@ -503,9 +503,9 @@ func (m *Message) encode() ([]byte, error) {
 }
 
 func decode(data []byte) (*Message, error) {
-	m := NewMessage()
-	m.header = &header{}
 	buf := bytes.NewBuffer(data)
+	p := NewMessage()
+	p.header = &header{}
 
 	// Parse the message header first.
 	b, err := buf.ReadByte()
@@ -515,48 +515,21 @@ func decode(data []byte) (*Message, error) {
 	if b >= pktInvalid {
 		return nil, fmt.Errorf("%v: invalid packet type %v", errDecoding, b)
 	}
-	m.header.ptype = b
+	p.header.ptype = b
 
-	if m.packetIsNamed() {
+	if p.packetIsNamed() {
 		name, err := decodeKey(buf)
 		if err != nil {
 			return nil, err
 		}
-		m.header.name = name
+		p.header.name = name
 	}
 
-	for buf.Len() > 0 {
-		b, err = buf.ReadByte()
-		if err != nil && err != io.EOF {
-			return nil, fmt.Errorf("%v: %v", errDecoding, err)
-		}
-
-		var (
-			key   string
-			value any
-			err   error
-		)
-		// Determine the next message element
-		switch b {
-		case msgKeyValue:
-			key, value, err = decodeKeyValue(buf)
-
-		case msgListStart:
-			key, value, err = decodeList(buf)
-
-		case msgSectionStart:
-			key, value, err = decodeSection(buf)
-
-		default:
-			return nil, errExpectedBeginning
-		}
-		if err != nil {
-			return nil, err
-		}
-		if err := m.addItemUnique(key, value); err != nil {
-			return nil, err
-		}
+	m, err := decodeElements(buf)
+	if err != nil {
+		return nil, err
 	}
+	m.header = p.header
 
 	return m, nil
 }
@@ -726,25 +699,36 @@ func decodeList(buf *bytes.Buffer) (string, []string, error) {
 
 // decodeSection will decode a section from the buffer
 func decodeSection(buf *bytes.Buffer) (string, *Message, error) {
-	section := NewMessage()
-
 	key, err := decodeKey(buf)
 	if err != nil {
 		return "", nil, err
 	}
 
-	b, err := buf.ReadByte()
+	section, err := decodeElements(buf)
 	if err != nil {
-		return "", nil, fmt.Errorf("%v: %v", errDecoding, err)
+		return "", nil, err
 	}
 
-	for b != msgSectionEnd {
+	return key, section, nil
+}
+
+func decodeElements(buf *bytes.Buffer) (*Message, error) {
+	m := NewMessage()
+
+	for {
+		b, err := buf.ReadByte()
+		if err == io.EOF || b == msgSectionEnd {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+
+		// Determine the next message element
 		var (
 			key   string
 			value any
-			err   error
 		)
-		// Determine the next message element
 		switch b {
 		case msgKeyValue:
 			key, value, err = decodeKeyValue(buf)
@@ -756,22 +740,17 @@ func decodeSection(buf *bytes.Buffer) (string, *Message, error) {
 			key, value, err = decodeSection(buf)
 
 		default:
-			return "", nil, errExpectedBeginning
+			return nil, errExpectedBeginning
 		}
 		if err != nil {
-			return "", nil, err
+			return nil, err
 		}
-		if err := section.addItemUnique(key, value); err != nil {
-			return "", nil, err
-		}
-
-		b, err = buf.ReadByte()
-		if err != nil {
-			return "", nil, fmt.Errorf("%v: %v", errDecoding, err)
+		if err := m.addItemUnique(key, value); err != nil {
+			return nil, err
 		}
 	}
 
-	return key, section, nil
+	return m, nil
 }
 
 // sendmsg is a helper to write a message to a given net.Conn.
