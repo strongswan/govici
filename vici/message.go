@@ -387,42 +387,6 @@ func (m *Message) elements() iter.Seq2[string, any] {
 	}
 }
 
-func decodeKey(buf *bytes.Buffer) (string, error) {
-	// Read the key from the buffer
-	n, err := buf.ReadByte()
-	if err != nil {
-		return "", fmt.Errorf("%v: %v", errDecoding, err)
-	}
-	if n == 0 {
-		return "", fmt.Errorf("%v: key cannot be empty", errDecoding)
-	}
-
-	k := string(buf.Next(int(n)))
-	if len(k) != int(n) {
-		return "", errBadKey
-	}
-
-	return k, nil
-}
-
-func decodeValue(buf *bytes.Buffer) (string, error) {
-	// Read the value's length
-	n := buf.Next(2)
-	if len(n) != 2 {
-		return "", errEndOfBuffer
-	}
-
-	// Read the value from the buffer
-	vl := int(binary.BigEndian.Uint16(n))
-	v := string(buf.Next(vl))
-
-	if len(v) != vl {
-		return "", errBadValue
-	}
-
-	return v, nil
-}
-
 func encodeKey(buf *bytes.Buffer, key string) error {
 	if key == "" {
 		return fmt.Errorf("%v: cannot encode empty key", errEncoding)
@@ -466,94 +430,6 @@ func encodeValue(buf *bytes.Buffer, value string) error {
 	return nil
 }
 
-func (m *Message) encode() ([]byte, error) {
-	buf := bytes.NewBuffer([]byte{})
-
-	if !m.header.isValid() {
-		return nil, fmt.Errorf("%v: cannot encode invalid packet", errEncoding)
-	}
-
-	if err := buf.WriteByte(m.header.ptype); err != nil {
-		return nil, fmt.Errorf("%v: %v", errEncoding, err)
-	}
-
-	if m.header.isNamed() {
-		if err := encodeKey(buf, m.header.name); err != nil {
-			return nil, err
-		}
-	}
-
-	if err := m.encodeElements(buf); err != nil {
-		return nil, err
-	}
-
-	return buf.Bytes(), nil
-}
-
-func decode(data []byte) (*Message, error) {
-	buf := bytes.NewBuffer(data)
-	header := &header{}
-
-	// Parse the message header first.
-	b, err := buf.ReadByte()
-	if err != nil {
-		return nil, fmt.Errorf("%v: %v", errDecoding, err)
-	}
-	if b >= pktInvalid {
-		return nil, fmt.Errorf("%v: invalid packet type %v", errDecoding, b)
-	}
-	header.ptype = b
-
-	if header.isNamed() {
-		name, err := decodeKey(buf)
-		if err != nil {
-			return nil, err
-		}
-		header.name = name
-	}
-
-	m, err := decodeElements(buf)
-	if err != nil {
-		return nil, err
-	}
-	m.header = header
-
-	return m, nil
-}
-
-// encodeElements encodes all of the message elements to the buffer.
-func (m *Message) encodeElements(buf *bytes.Buffer) error {
-	for k, v := range m.elements() {
-		switch v := v.(type) {
-		case string:
-			if err := encodeKeyValue(buf, k, v); err != nil {
-				return err
-			}
-
-		case []string:
-			if err := encodeList(buf, k, v); err != nil {
-				return err
-			}
-
-		case *Message:
-			if err := encodeSection(buf, k, v); err != nil {
-				return err
-			}
-
-		default:
-			// This should never happen.
-			return errUnsupportedType
-		}
-	}
-
-	return nil
-}
-
-// encodeKeyValue will return a byte slice of an encoded key-value pair.
-//
-// The size of the byte slice is the length of the key and value, plus four bytes:
-// one byte for message element type, one byte for key length, and two bytes for value
-// length.
 func encodeKeyValue(buf *bytes.Buffer, key string, value string) error {
 	// Initialize buffer to indictate the message element type
 	// is a key-value pair
@@ -572,12 +448,6 @@ func encodeKeyValue(buf *bytes.Buffer, key string, value string) error {
 	return nil
 }
 
-// encodeList will encode the list to the provided buffer.
-//
-// The size of the byte slice is the length of the key and total length of
-// the list (sum of length of the items in the list), plus three bytes for each
-// list item: one for message element type, and two for item length. Another three
-// bytes are used to indicate list start and list stop, and the length of the key.
 func encodeList(buf *bytes.Buffer, key string, list []string) error {
 	// Initialize buffer to indictate the message element type
 	// is the start of a list
@@ -608,7 +478,6 @@ func encodeList(buf *bytes.Buffer, key string, list []string) error {
 	return nil
 }
 
-// encodeSection will encode the section to the given buffer.
 func encodeSection(buf *bytes.Buffer, key string, section *Message) error {
 	// Initialize buffer to indictate the message element type
 	// is the start of a section
@@ -632,7 +501,93 @@ func encodeSection(buf *bytes.Buffer, key string, section *Message) error {
 	return nil
 }
 
-// decodeKeyValue will decode a key-value pair from the buffer
+func (m *Message) encodeElements(buf *bytes.Buffer) error {
+	for k, v := range m.elements() {
+		switch v := v.(type) {
+		case string:
+			if err := encodeKeyValue(buf, k, v); err != nil {
+				return err
+			}
+
+		case []string:
+			if err := encodeList(buf, k, v); err != nil {
+				return err
+			}
+
+		case *Message:
+			if err := encodeSection(buf, k, v); err != nil {
+				return err
+			}
+
+		default:
+			// This should never happen.
+			return errUnsupportedType
+		}
+	}
+
+	return nil
+}
+
+func (m *Message) encode() ([]byte, error) {
+	buf := bytes.NewBuffer([]byte{})
+
+	if !m.header.isValid() {
+		return nil, fmt.Errorf("%v: cannot encode invalid packet", errEncoding)
+	}
+
+	if err := buf.WriteByte(m.header.ptype); err != nil {
+		return nil, fmt.Errorf("%v: %v", errEncoding, err)
+	}
+
+	if m.header.isNamed() {
+		if err := encodeKey(buf, m.header.name); err != nil {
+			return nil, err
+		}
+	}
+
+	if err := m.encodeElements(buf); err != nil {
+		return nil, err
+	}
+
+	return buf.Bytes(), nil
+}
+
+func decodeKey(buf *bytes.Buffer) (string, error) {
+	// Read the key from the buffer
+	n, err := buf.ReadByte()
+	if err != nil {
+		return "", fmt.Errorf("%v: %v", errDecoding, err)
+	}
+	if n == 0 {
+		return "", fmt.Errorf("%v: key cannot be empty", errDecoding)
+	}
+
+	k := string(buf.Next(int(n)))
+	if len(k) != int(n) {
+		return "", errBadKey
+	}
+
+	return k, nil
+}
+
+func decodeValue(buf *bytes.Buffer) (string, error) {
+	// Read the value's length
+	n := buf.Next(2)
+	if len(n) != 2 {
+		return "", errEndOfBuffer
+	}
+
+	// Read the value from the buffer
+	vl := int(binary.BigEndian.Uint16(n))
+	v := string(buf.Next(vl))
+
+	if len(v) != vl {
+		return "", errBadValue
+	}
+
+	return v, nil
+}
+
 func decodeKeyValue(buf *bytes.Buffer) (string, string, error) {
 	key, err := decodeKey(buf)
 	if err != nil {
@@ -647,7 +602,6 @@ func decodeKeyValue(buf *bytes.Buffer) (string, string, error) {
 	return key, value, nil
 }
 
-// decodeList will decode a list from the buffer
 func decodeList(buf *bytes.Buffer) (string, []string, error) {
 	var list []string
 
@@ -684,7 +638,6 @@ func decodeList(buf *bytes.Buffer) (string, []string, error) {
 	return key, list, nil
 }
 
-// decodeSection will decode a section from the buffer
 func decodeSection(buf *bytes.Buffer) (string, *Message, error) {
 	key, err := decodeKey(buf)
 	if err != nil {
@@ -736,6 +689,37 @@ func decodeElements(buf *bytes.Buffer) (*Message, error) {
 			return nil, err
 		}
 	}
+
+	return m, nil
+}
+
+func decode(data []byte) (*Message, error) {
+	buf := bytes.NewBuffer(data)
+	header := &header{}
+
+	// Parse the message header first.
+	b, err := buf.ReadByte()
+	if err != nil {
+		return nil, fmt.Errorf("%v: %v", errDecoding, err)
+	}
+	if b >= pktInvalid {
+		return nil, fmt.Errorf("%v: invalid packet type %v", errDecoding, b)
+	}
+	header.ptype = b
+
+	if header.isNamed() {
+		name, err := decodeKey(buf)
+		if err != nil {
+			return nil, err
+		}
+		header.name = name
+	}
+
+	m, err := decodeElements(buf)
+	if err != nil {
+		return nil, err
+	}
+	m.header = header
 
 	return m, nil
 }
