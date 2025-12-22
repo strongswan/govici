@@ -170,11 +170,11 @@ func (cc *clientConn) write(ctx context.Context, p *Message) error {
 		return errors.New("message cannot be nil")
 	}
 
-	if !p.packetIsValid() {
+	if !p.header.isValid() {
 		return errors.New("packet header is invalid")
 	}
 
-	if !p.packetIsRequest() {
+	if !p.header.isRequest() {
 		return fmt.Errorf("invalid request with packet type %v", p.header.ptype)
 	}
 

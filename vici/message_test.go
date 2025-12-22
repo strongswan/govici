@@ -85,11 +85,13 @@ var (
 			"key1": "value1",
 			// Section is another message
 			"section1": &Message{
-				keys: []string{"sub-section", "list1"},
+				header: &header{},
+				keys:   []string{"sub-section", "list1"},
 				data: map[string]any{
 					// Sub-section is a another message
 					"sub-section": &Message{
-						keys: []string{"key2"},
+						header: &header{},
+						keys:   []string{"key2"},
 						data: map[string]any{
 							"key2": "value2",
 						},
@@ -130,7 +132,8 @@ var (
 		Key:  "value",
 		List: []string{"item1", "item2"},
 		Message: &Message{
-			keys: []string{"key1"},
+			header: &header{},
+			keys:   []string{"key1"},
 			data: map[string]any{
 				"key1": "value1",
 			},
@@ -148,24 +151,28 @@ var (
 	}
 
 	goldMarshaled = &Message{
-		keys: []string{"key", "list", "message", "section1", "section2"},
+		header: &header{},
+		keys:   []string{"key", "list", "message", "section1", "section2"},
 		data: map[string]any{
 			"key":  "value",
 			"list": []string{"item1", "item2"},
 			"message": &Message{
-				keys: []string{"key1"},
+				header: &header{},
+				keys:   []string{"key1"},
 				data: map[string]any{
 					"key1": "value1",
 				},
 			},
 			"section1": &Message{
-				keys: []string{"key"},
+				header: &header{},
+				keys:   []string{"key"},
 				data: map[string]any{
 					"key": "key2",
 				},
 			},
 			"section2": &Message{
-				keys: []string{"list"},
+				header: &header{},
+				keys:   []string{"list"},
 				data: map[string]any{
 					"list": []string{"item3", "item4"},
 				},
@@ -468,7 +475,8 @@ func TestUnmarshalMessage(t *testing.T) {
 
 func TestUnmarshalMessageMapSimple(t *testing.T) {
 	marshaled := &Message{
-		keys: []string{"one", "two"},
+		header: &header{},
+		keys:   []string{"one", "two"},
 		data: map[string]any{
 			"one": "1",
 			"two": "2",
@@ -501,7 +509,8 @@ func TestUnmarshalMessageMapSimple(t *testing.T) {
 
 func TestUnmarshalMessageMapPointers(t *testing.T) {
 	marshaled := &Message{
-		keys: []string{"section1", "section2"},
+		header: &header{},
+		keys:   []string{"section1", "section2"},
 		data: map[string]any{
 			"section1": goldMarshaled.data["section1"],
 			"section2": goldMarshaled.data["section2"],
@@ -526,7 +535,8 @@ func TestUnmarshalMessageMapPointers(t *testing.T) {
 
 func TestUnmarshalMessageMapNotPointers(t *testing.T) {
 	marshaled := &Message{
-		keys: []string{"section1", "section2"},
+		header: &header{},
+		keys:   []string{"section1", "section2"},
 		data: map[string]any{
 			"section1": goldMarshaled.data["section1"],
 			"section2": goldMarshaled.data["section2"]},
@@ -671,7 +681,8 @@ func TestMessageSet(t *testing.T) {
 
 func TestMessageUnset(t *testing.T) {
 	m1 := &Message{
-		keys: []string{"test1", "test2", "test3", "test4"},
+		header: &header{},
+		keys:   []string{"test1", "test2", "test3", "test4"},
 		data: map[string]any{
 			"test1": 1,
 			"test2": 2,
@@ -681,7 +692,8 @@ func TestMessageUnset(t *testing.T) {
 	}
 
 	m2 := &Message{
-		keys: []string{"test1", "test2", "test4"},
+		header: &header{},
+		keys:   []string{"test1", "test2", "test4"},
 		data: map[string]any{
 			"test1": 1,
 			"test2": 2,
@@ -842,6 +854,15 @@ func TestEmptyMessageElement(t *testing.T) {
 	}
 }
 
+// TestEmptyHeaderIsInvalid ensures that empty/zero-value header is considered invalid.
+func TestEmptyHeaderIsInvalid(t *testing.T) {
+	h := &header{}
+
+	if h.isValid() {
+		t.Fatal("Empty header must not be considered valid!")
+	}
+}
+
 // FuzzDecode fuzzes the decoding of raw data into message packets, and vice versa.
 func FuzzEncodeDecode(f *testing.F) {
 	testcases := [][]byte{
@@ -860,7 +881,7 @@ func FuzzEncodeDecode(f *testing.F) {
 			return
 		}
 
-		if !m.packetIsValid() {
+		if !m.header.isValid() {
 			t.Errorf("Decoded packet is invalid:\n\npacket: %+v\n\ndata: %v", m, data)
 		}
 
