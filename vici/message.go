@@ -140,10 +140,60 @@ type header struct {
 	seq   uint64
 }
 
+// isNamed returns a bool indicating the packet is a named type
+func (h *header) isNamed() bool {
+	switch h.ptype {
+	case /* Named packet types */
+		pktCmdRequest,
+		pktEventRegister,
+		pktEventUnregister,
+		pktEvent:
+
+		return true
+
+	case /* Un-named packet types */
+		pktCmdResponse,
+		pktCmdUnknown,
+		pktEventConfirm,
+		pktEventUnknown:
+
+		return false
+	}
+
+	return false
+}
+
+// isValid checks a packet header to make sure it is valid
+func (h *header) isValid() bool {
+	if h.ptype >= pktInvalid {
+		return false
+	}
+
+	if h.isNamed() && h.name == "" {
+		return false
+	}
+
+	return true
+}
+
+func (h *header) isRequest() bool {
+	switch h.ptype {
+	case /* Valid client requests */
+		pktCmdRequest,
+		pktEventRegister,
+		pktEventUnregister:
+
+		return true
+
+	default:
+		return false
+	}
+}
+
 // NewMessage returns an empty Message.
 func NewMessage() *Message {
 	return &Message{
-		header: nil,
+		header: &header{},
 		keys:   make([]string, 0),
 		data:   make(map[string]any),
 	}
@@ -288,68 +338,6 @@ func (m *Message) String() string {
 	return m.stringIndent("", "  ")
 }
 
-// packetIsNamed returns a bool indicating the packet is a named type
-func (m *Message) packetIsNamed() bool {
-	if m.header == nil {
-		return false
-	}
-
-	switch m.header.ptype {
-	case /* Named packet types */
-		pktCmdRequest,
-		pktEventRegister,
-		pktEventUnregister,
-		pktEvent:
-
-		return true
-
-	case /* Un-named packet types */
-		pktCmdResponse,
-		pktCmdUnknown,
-		pktEventConfirm,
-		pktEventUnknown:
-
-		return false
-	}
-
-	return false
-}
-
-// packetIsValid checks a packet header to make sure it is valid
-func (m *Message) packetIsValid() bool {
-	if m.header == nil {
-		return false
-	}
-
-	if m.header.ptype >= pktInvalid {
-		return false
-	}
-
-	if m.packetIsNamed() && m.header.name == "" {
-		return false
-	}
-
-	return true
-}
-
-func (m *Message) packetIsRequest() bool {
-	if m.header == nil {
-		return false
-	}
-
-	switch m.header.ptype {
-	case /* Valid client requests */
-		pktCmdRequest,
-		pktEventRegister,
-		pktEventUnregister:
-
-		return true
-
-	default:
-		return false
-	}
-}
-
 func (m *Message) addItemFull(key string, value any, unique bool) error {
 	// Check if the key is already set in the message
 	_, exists := m.data[key]
@@ -481,7 +469,7 @@ func encodeValue(buf *bytes.Buffer, value string) error {
 func (m *Message) encode() ([]byte, error) {
 	buf := bytes.NewBuffer([]byte{})
 
-	if !m.packetIsValid() {
+	if !m.header.isValid() {
 		return nil, fmt.Errorf("%v: cannot encode invalid packet", errEncoding)
 	}
 
@@ -489,7 +477,7 @@ func (m *Message) encode() ([]byte, error) {
 		return nil, fmt.Errorf("%v: %v", errEncoding, err)
 	}
 
-	if m.packetIsNamed() {
+	if m.header.isNamed() {
 		if err := encodeKey(buf, m.header.name); err != nil {
 			return nil, err
 		}
@@ -504,8 +492,7 @@ func (m *Message) encode() ([]byte, error) {
 
 func decode(data []byte) (*Message, error) {
 	buf := bytes.NewBuffer(data)
-	p := NewMessage()
-	p.header = &header{}
+	header := &header{}
 
 	// Parse the message header first.
 	b, err := buf.ReadByte()
@@ -515,21 +502,21 @@ func decode(data []byte) (*Message, error) {
 	if b >= pktInvalid {
 		return nil, fmt.Errorf("%v: invalid packet type %v", errDecoding, b)
 	}
-	p.header.ptype = b
+	header.ptype = b
 
-	if p.packetIsNamed() {
+	if header.isNamed() {
 		name, err := decodeKey(buf)
 		if err != nil {
 			return nil, err
 		}
-		p.header.name = name
+		header.name = name
 	}
 
 	m, err := decodeElements(buf)
 	if err != nil {
 		return nil, err
 	}
-	m.header = p.header
+	m.header = header
 
 	return m, nil
 }
