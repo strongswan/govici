@@ -895,3 +895,39 @@ func FuzzEncodeDecode(f *testing.F) {
 		}
 	})
 }
+
+func benchmarkEncode(b *testing.B, m *Message) {
+	for b.Loop() {
+		_, _ = m.encode()
+	}
+}
+
+func BenchmarkEncode1(b *testing.B) {
+	benchmarkEncode(b, goldNamedPacket)
+}
+
+func BenchmarkEncode2(b *testing.B) {
+	benchmarkEncode(b, goldUnnamedPacket)
+}
+
+func BenchmarkEncode3(b *testing.B) {
+	benchmarkEncode(b, goldMessage)
+}
+
+func benchmarkDecode(b *testing.B, raw []byte) {
+	for b.Loop() {
+		_, _ = decode(raw)
+	}
+}
+
+func BenchmarkDecode1(b *testing.B) {
+	benchmarkDecode(b, goldNamedPacketBytes)
+}
+
+func BenchmarkDecode2(b *testing.B) {
+	benchmarkDecode(b, goldUnnamedPacketBytes)
+}
+
+func BenchmarkDecode3(b *testing.B) {
+	benchmarkDecode(b, goldMessageBytes)
+}
