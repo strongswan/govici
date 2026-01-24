@@ -129,13 +129,7 @@ func (cc *clientConn) listen() {
 			// Only increment this counter for direct response packets.
 			cc.rseq++
 			p.header.seq = cc.rseq
-
-			select {
-			case cc.pc <- p:
-			default:
-				// For now, silently drop the packet. Do not block
-				// if the chan is full.
-			}
+			cc.pc <- p
 
 		case /* These are only handled server-side, ignore. */
 			pktCmdRequest,
@@ -454,10 +448,7 @@ func (cc *clientConn) dispatch(ev Event) {
 	if ev.Name == cc.events.streaming {
 		// This event is associated with an active streaming call.
 		// Dispatch internally only.
-		select {
-		case cc.pc <- ev.Message:
-		default:
-		}
+		cc.pc <- ev.Message
 
 		return
 	}
