@@ -1,0 +1,25 @@
+on: [push, pull_request]
+name: Fuzz
+jobs:
+  fuzz:
+    strategy:
+      matrix:
+        go-version: [1.25.x]
+        os: [ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+    - name: Install Go
+      uses: actions/setup-go@v2
+      with:
+        go-version: ${{ matrix.go-version }}
+    - name: Checkout code
+      uses: actions/checkout@v2
+    - name: Fuzz
+      run: go test -v -fuzz=Fuzz -fuzztime 30s ./vici
+    - name: New fuzz failure
+      if: ${{ failure() }}
+      run: |
+        for f in $(git ls-files --other vici/testdata/fuzz/FuzzEncodeDecode/); do
+          echo "# $f"
+          cat $f
+        done
