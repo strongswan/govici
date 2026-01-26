@@ -644,7 +644,7 @@ func decodeSection(buf *bytes.Buffer) (string, *Message, error) {
 		return "", nil, err
 	}
 
-	section, err := decodeElements(buf)
+	section, err := decodeElements(buf, true /* nested */)
 	if err != nil {
 		return "", nil, err
 	}
@@ -652,16 +652,20 @@ func decodeSection(buf *bytes.Buffer) (string, *Message, error) {
 	return key, section, nil
 }
 
-func decodeElements(buf *bytes.Buffer) (*Message, error) {
+func decodeElements(buf *bytes.Buffer, nested bool) (*Message, error) {
 	m := NewMessage()
 
 	for {
 		b, err := buf.ReadByte()
-		if err == io.EOF || b == msgSectionEnd {
-			break
-		}
 		if err != nil {
+			if !nested && err == io.EOF {
+				return m, nil
+			}
+
 			return nil, err
+		}
+		if nested && b == msgSectionEnd {
+			return m, nil
 		}
 
 		// Determine the next message element
@@ -689,8 +693,6 @@ func decodeElements(buf *bytes.Buffer) (*Message, error) {
 			return nil, err
 		}
 	}
-
-	return m, nil
 }
 
 func decode(data []byte) (*Message, error) {
@@ -715,7 +717,7 @@ func decode(data []byte) (*Message, error) {
 		header.name = name
 	}
 
-	m, err := decodeElements(buf)
+	m, err := decodeElements(buf, false /* nested */)
 	if err != nil {
 		return nil, err
 	}
