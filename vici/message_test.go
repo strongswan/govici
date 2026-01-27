@@ -931,3 +931,22 @@ func BenchmarkDecode2(b *testing.B) {
 func BenchmarkDecode3(b *testing.B) {
 	benchmarkDecode(b, goldMessageBytes)
 }
+
+func BenchmarkMarshal(b *testing.B) {
+	for b.Loop() {
+		_, _ = MarshalMessage(goldUnmarshaled)
+	}
+}
+
+func BenchmarkUnmarshal(b *testing.B) {
+	for b.Loop() {
+		b.StopTimer()
+		tm := &testMessage{
+			Message:  NewMessage(),
+			Section2: &testSection{},
+		}
+		b.StartTimer()
+
+		_ = UnmarshalMessage(goldMarshaled, tm)
+	}
+}
