@@ -305,6 +305,27 @@ func (cc *clientConn) request(ctx context.Context, ptype uint8, name string, in 
 	return p, p.Err()
 }
 
+func (cc *clientConn) register(ctx context.Context, event string) error {
+	cc.events.Lock()
+	defer cc.events.Unlock()
+
+	if _, err := cc.request(ctx, pktEventRegister, event, nil); err != nil {
+		return err
+	}
+	cc.events.streaming = event
+
+	return nil
+}
+
+func (cc *clientConn) unregister(ctx context.Context, event string) {
+	cc.events.Lock()
+	defer cc.events.Unlock()
+
+	// nolint
+	_, _ = cc.request(ctx, pktEventUnregister, event, nil)
+	cc.events.streaming = ""
+}
+
 func (cc *clientConn) stream(ctx context.Context, cmd string, event string, in *Message) iter.Seq2[*Message, error] {
 	return func(yield func(*Message, error) bool) {
 		if in == nil {
@@ -317,21 +338,11 @@ func (cc *clientConn) stream(ctx context.Context, cmd string, event string, in *
 		}
 
 		// Initialize the associated event streaming.
-		if _, err := cc.request(ctx, pktEventRegister, event, nil); err != nil {
+		if err := cc.register(ctx, event); err != nil {
 			yield(nil, err)
 			return
 		}
-		cc.events.Lock()
-		cc.events.streaming = event
-		cc.events.Unlock()
-		defer func() {
-			// nolint
-			_, _ = cc.request(ctx, pktEventUnregister, event, nil)
-
-			cc.events.Lock()
-			cc.events.streaming = ""
-			cc.events.Unlock()
-		}()
+		defer cc.unregister(ctx, event)
 
 		if err := cc.write(ctx, in); err != nil {
 			yield(nil, err)
