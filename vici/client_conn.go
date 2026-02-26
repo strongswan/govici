@@ -265,22 +265,8 @@ func (cc *clientConn) wait(ctx context.Context) (*Message, error) {
 		return nil, errors.New("context cannot be nil")
 	}
 
-	// nolint
-	defer cc.conn.SetReadDeadline(time.Time{})
 	for {
-		// Wait for the response packet as long as the context is not
-		// cancelled, and as long as we continue receiving packets from
-		// the server.
-		deadline := time.Now().Add(5 * time.Second)
-
-		if d, ok := ctx.Deadline(); ok && d.After(deadline) {
-			deadline = d.Add(5 * time.Second)
-		}
-
-		if err := cc.conn.SetReadDeadline(deadline); err != nil {
-			return nil, err
-		}
-
+		// Timeout should be handled by caller's context
 		select {
 		case <-ctx.Done():
 			return nil, ctx.Err()
