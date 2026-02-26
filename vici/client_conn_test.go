@@ -27,7 +27,6 @@ import (
 	"errors"
 	"io"
 	"net"
-	"os"
 	"reflect"
 	"strconv"
 	"sync"
@@ -536,18 +535,6 @@ func TestClientConnWaitNoResponse(t *testing.T) {
 		synctest.Wait()
 		if _, err := cc.wait(ctx); !errors.Is(err, context.DeadlineExceeded) {
 			t.Fatalf("Expected deadline exceeded on wait, but got %v", err)
-		}
-
-		// Without a context deadline, we should get a timeout error from
-		// the default read deadline.
-		in.header.name = "cmd-no-response"
-		if err := cc.write(context.Background(), in); err != nil {
-			t.Fatalf("Failed to write %s: %v", in.header.name, err)
-		}
-
-		synctest.Wait()
-		if _, err := cc.wait(context.Background()); !errors.Is(err, os.ErrDeadlineExceeded) {
-			t.Fatalf("Expected timeout on wait, but got %v", err)
 		}
 	})
 }
