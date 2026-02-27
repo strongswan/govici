@@ -3,6 +3,15 @@ All notable changes to govici will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
+## [v0.8.2] - 2025-02-27
+
+### Fixed
+
+- Remove read deadline while waiting for responses, which prevents unnecessary
+  exit in listen loop. This restores the behavior that a command request without
+  a context deadline will wait indefinitely.
+- Several small fixes in message decoding caught by fuzzing.
+
 ## [v0.8.1] - 2025-11-21
 
 ### Fixed
@@ -113,3 +122,4 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 [v0.7.0]: https://github.com/strongswan/govici/compare/v0.6.0...v0.7.0
 [v0.8.0]: https://github.com/strongswan/govici/compare/v0.7.0...v0.8.0
 [v0.8.1]: https://github.com/strongswan/govici/compare/v0.8.0...v0.8.1
+[v0.8.2]: https://github.com/strongswan/govici/compare/v0.8.1...v0.8.2
