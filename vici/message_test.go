@@ -24,6 +24,7 @@ import (
 	"bytes"
 	"fmt"
 	"reflect"
+	"slices"
 	"sort"
 	"testing"
 )
@@ -635,6 +636,353 @@ func TestMessageGet(t *testing.T) {
 	v = goldMessage.Get("invalid")
 	if v != nil {
 		t.Fatalf("Expected nil for Get on non-existent key: received %v", v)
+	}
+}
+
+func TestMessageGetAny(t *testing.T) {
+	table := []struct {
+		keys   []string
+		valid  bool
+		expect any
+	}{
+		// Valid
+		{
+			keys:   []string{"key1"},
+			valid:  true,
+			expect: "value1",
+		},
+		{
+			keys:   []string{"section1", "sub-section", "key2"},
+			valid:  true,
+			expect: "value2",
+		},
+		{
+			keys:   []string{"section1", "list1"},
+			valid:  true,
+			expect: []string{"item1", "item2"},
+		},
+		{
+			keys:  []string{"section1"},
+			valid: true,
+			expect: &Message{
+				header: &header{},
+				keys:   []string{"sub-section", "list1"},
+				data: map[string]any{
+					// Sub-section is a another message
+					"sub-section": &Message{
+						header: &header{},
+						keys:   []string{"key2"},
+						data: map[string]any{
+							"key2": "value2",
+						},
+					},
+					"list1": []string{"item1", "item2"},
+				},
+			},
+		},
+		{
+			keys:  []string{"section1", "sub-section"},
+			valid: true,
+			expect: &Message{
+				header: &header{},
+				keys:   []string{"key2"},
+				data: map[string]any{
+					"key2": "value2",
+				},
+			},
+		},
+		// Invalid
+		{
+			keys:  []string{"section1", "sub-section", "list2"},
+			valid: false,
+		},
+		{
+			keys:  []string{"section1", "sub-section2", "list1"},
+			valid: false,
+		},
+		{
+			keys:  []string{"section1", "sub-section", "sub-sub-section"},
+			valid: false,
+		},
+		{
+			keys:  []string{"key3"},
+			valid: false,
+		},
+		{
+			keys:  []string{},
+			valid: false,
+		},
+	}
+
+	for _, test := range table {
+		v, ok := goldMessage.GetAny(test.keys...)
+		if !ok {
+			if !test.valid {
+				continue
+			}
+
+			t.Fatalf("Expected valid value for %s!", test.keys)
+		}
+		if !test.valid {
+			t.Fatalf("Expected invalid data for %s!", test.keys)
+		}
+		if !reflect.DeepEqual(v, test.expect) {
+			t.Fatalf("Wrong string for %s:\nexpected:\n%s\ngot:\n%s", test.keys, test.expect, v)
+		}
+	}
+}
+
+func ExampleMessage_GetAny() {
+	a := NewMessage()
+	if err := a.Set("key1", "value2"); err != nil {
+		fmt.Println(err)
+		return
+	}
+	if err := a.Set("list1", []string{"item1", "item2"}); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	b := NewMessage()
+	if err := b.Set("section2", a); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	c := NewMessage()
+	if err := c.Set("key1", "value1"); err != nil {
+		fmt.Println(err)
+		return
+	}
+	if err := c.Set("section1", b); err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	fmt.Println(c)
+
+	if v, ok := c.GetAny("key1"); ok {
+		fmt.Println(v)
+	}
+	if v, ok := c.GetAny("section1", "section2", "key1"); ok {
+		fmt.Println(v)
+	}
+	if v, ok := c.GetAny("section1", "section2", "list1"); ok {
+		fmt.Println(v)
+	}
+	// Output: {
+	//   key1 = value1
+	//   section1 {
+	//     section2 {
+	//       key1 = value2
+	//       list1 = item1,item2
+	//     }
+	//   }
+	// }
+	//
+	// value1
+	// value2
+	// [item1 item2]
+}
+
+func TestMessageGetValue(t *testing.T) {
+	table := []struct {
+		keys   []string
+		valid  bool
+		expect string
+	}{
+		// Valid
+		{
+			keys:   []string{"key1"},
+			valid:  true,
+			expect: "value1",
+		},
+		{
+			keys:   []string{"section1", "sub-section", "key2"},
+			valid:  true,
+			expect: "value2",
+		},
+		// Invalid
+		{
+			keys:  []string{"section1", "sub-section", "key3"},
+			valid: false,
+		},
+		{
+			keys:  []string{"section1", "list1"},
+			valid: false,
+		},
+		{
+			keys:  []string{"section1", "sub-section"},
+			valid: false,
+		},
+		{
+			keys:  []string{"key3"},
+			valid: false,
+		},
+		{
+			keys:  []string{},
+			valid: false,
+		},
+	}
+
+	for _, test := range table {
+		v, ok := goldMessage.GetValue(test.keys...)
+		if !ok {
+			if !test.valid {
+				continue
+			}
+
+			t.Fatalf("Expected valid string for %s!", test.keys)
+		}
+		if !test.valid {
+			t.Fatalf("Expected invalid data for %s!", test.keys)
+		}
+		if v != test.expect {
+			t.Fatalf("Wrong string for %s: expected %q, got %q", test.keys, test.expect, v)
+		}
+	}
+}
+
+func TestMessageGetList(t *testing.T) {
+	table := []struct {
+		keys   []string
+		valid  bool
+		expect []string
+	}{
+		// Valid
+		{
+			keys:   []string{"section1", "list1"},
+			valid:  true,
+			expect: []string{"item1", "item2"},
+		},
+		// Invalid
+		{
+			keys:  []string{"key1"},
+			valid: false,
+		},
+		{
+			keys:  []string{"section1", "sub-section", "key2"},
+			valid: false,
+		},
+		{
+			keys:  []string{"section1", "sub-section", "list2"},
+			valid: false,
+		},
+		{
+			keys:  []string{"section1", "sub-section"},
+			valid: false,
+		},
+		{
+			keys:  []string{"key3"},
+			valid: false,
+		},
+		{
+			keys:  []string{},
+			valid: false,
+		},
+	}
+
+	for _, test := range table {
+		v, ok := goldMessage.GetList(test.keys...)
+		if !ok {
+			if !test.valid {
+				continue
+			}
+
+			t.Fatalf("Expected valid list for %s!", test.keys)
+		}
+		if !test.valid {
+			t.Fatalf("Expected invalid data for %s!", test.keys)
+		}
+		if !slices.Equal(v, test.expect) {
+			t.Fatalf("Wrong string for %s: expected %v, got %v", test.keys, test.expect, v)
+		}
+	}
+}
+
+func TestMessageGetSection(t *testing.T) {
+	table := []struct {
+		keys   []string
+		valid  bool
+		expect *Message
+	}{
+		// Valid
+		{
+			keys:  []string{"section1"},
+			valid: true,
+			expect: &Message{
+				header: &header{},
+				keys:   []string{"sub-section", "list1"},
+				data: map[string]any{
+					// Sub-section is a another message
+					"sub-section": &Message{
+						header: &header{},
+						keys:   []string{"key2"},
+						data: map[string]any{
+							"key2": "value2",
+						},
+					},
+					"list1": []string{"item1", "item2"},
+				},
+			},
+		},
+		{
+			keys:  []string{"section1", "sub-section"},
+			valid: true,
+			expect: &Message{
+				header: &header{},
+				keys:   []string{"key2"},
+				data: map[string]any{
+					"key2": "value2",
+				},
+			},
+		},
+		// Invalid
+		{
+			keys:  []string{"key1"},
+			valid: false,
+		},
+		{
+			keys:  []string{"section1", "sub-section", "key2"},
+			valid: false,
+		},
+		{
+			keys:  []string{"section1", "sub-section", "list1"},
+			valid: false,
+		},
+		{
+			keys:  []string{"section1", "sub-section2", "list1"},
+			valid: false,
+		},
+		{
+			keys:  []string{"section1", "sub-section", "sub-sub-section"},
+			valid: false,
+		},
+		{
+			keys:  []string{"key3"},
+			valid: false,
+		},
+		{
+			keys:  []string{},
+			valid: false,
+		},
+	}
+
+	for _, test := range table {
+		v, ok := goldMessage.GetSection(test.keys...)
+		if !ok {
+			if !test.valid {
+				continue
+			}
+
+			t.Fatalf("Expected valid section for %s!", test.keys)
+		}
+		if !test.valid {
+			t.Fatalf("Expected invalid data for %s!", test.keys)
+		}
+		if !reflect.DeepEqual(v, test.expect) {
+			t.Fatalf("Wrong string for %s:\nexpected:\n%s\ngot:\n%s", test.keys, test.expect, v)
+		}
 	}
 }
 

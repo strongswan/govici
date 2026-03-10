@@ -293,6 +293,75 @@ func (m *Message) Get(key string) any {
 	return v
 }
 
+// GetAny returns the value of the field identified by the given key, if
+// it exists. If the value is valid, ok is set to true, and false otherwise.
+//
+// A key is given by one or more strings. A key formed by one string will yield
+// a value directly from m. A key formed by multiple strings can be used to access
+// values nested within sections of m.
+//
+// If a valid value is returned, its type will be one of string, []string, or *Message.
+// If the expected type of the value is known, it is better to use GetValue, GetList,
+// or GetSection accordingly.
+func (m *Message) GetAny(keys ...string) (value any, ok bool) {
+	l := len(keys)
+	if l == 0 {
+		return nil, false
+	}
+
+	v := m
+	for _, k := range keys[:l-1] {
+		w, ok := v.data[k]
+		if !ok {
+			return nil, false
+		}
+
+		v, ok = w.(*Message)
+		if !ok {
+			return nil, false
+		}
+	}
+
+	w, ok := v.data[keys[l-1]]
+	return w, ok
+}
+
+// GetValue is like GetAny, but requires that the type of the resulting value be
+// string. Otherwise, ok is set to false.
+func (m *Message) GetValue(keys ...string) (value string, ok bool) {
+	v, ok := m.GetAny(keys...)
+	if !ok {
+		return "", false
+	}
+
+	w, ok := v.(string)
+	return w, ok
+}
+
+// GetList is like GetAny, but requires that the type of the resulting value be
+// []string. Otherwise, ok is set to false.
+func (m *Message) GetList(keys ...string) (list []string, ok bool) {
+	v, ok := m.GetAny(keys...)
+	if !ok {
+		return nil, false
+	}
+
+	w, ok := v.([]string)
+	return w, ok
+}
+
+// GetSection is like GetAny, but requires that the type of the resulting value be
+// *Message. Otherwise, ok is set to false.
+func (m *Message) GetSection(keys ...string) (section *Message, ok bool) {
+	v, ok := m.GetAny(keys...)
+	if !ok {
+		return nil, false
+	}
+
+	w, ok := v.(*Message)
+	return w, ok
+}
+
 // Keys returns the list of valid message keys.
 func (m *Message) Keys() []string {
 	keys := make([]string, len(m.keys))
@@ -811,9 +880,6 @@ func emptyMessageElement(rv reflect.Value) bool {
 	case reflect.Map:
 		return rv.IsNil() || len(rv.MapKeys()) == 0
 
-	// The rest of the types checked here are ALWAYS considered non-empty, because
-	// they will be encoded in their appropriate string representations, which are
-	// always non-empty.
 	case reflect.Int, reflect.Int8, reflect.Int16, reflect.Int32, reflect.Int64:
 		return false
 
