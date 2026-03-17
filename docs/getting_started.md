@@ -262,23 +262,25 @@ func monitor(ike string) error {
                 // field contains the Message from the server.
                 switch e.Name {
                 case "ike-updown":
-                        m, ok := e.Message.Get(ike).(*vici.Message)
+                        state, ok := e.GetValue(ike, "state")
                         if !ok {
                                 // This message is not about the IKE SA we are
                                 // monitoring. Ignore.
                                 continue
                         }
 
-                        fmt.Printf("IKE-UPDOWN: %s state changed: %s\n", ike, m.Get("state"))
+                        fmt.Printf("IKE-UPDOWN: %s state changed: %s\n", ike, state)
                 case "log":
-                        if s, ok := e.Message.Get("ikesa-name").(string); !ok || s != ike {
+                        if s, ok := e.Message.GetValue("ikesa-name"); !ok || s != ike {
                                 // This message is not about the IKE SA we are
                                 // monitoring. Ignore.
                                 continue
                         }
 
-                        // Log events contain a 'msg' field with the log message
-                        fmt.Println("LOG:", e.Message.Get("msg"))
+                        if msg, ok := e.Message.GetValue("msg"); ok {
+                                // Log events contain a 'msg' field with the log message
+                                fmt.Println("LOG:", msg)
+                        }
                 }
         }
 }
@@ -554,7 +556,9 @@ func initiate(s *vici.Session, ike, child string) error {
                         return err
                 }
 
-                fmt.Println("LOG:", m.Get("msg"))
+                if msg, ok := m.GetValue("msg"); ok {
+                        fmt.Println("LOG:", msg)
+                }
         }
 
         return nil
