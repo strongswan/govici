@@ -105,7 +105,7 @@ func TestMarshalBoolTrue(t *testing.T) {
 		t.Fatalf("Error marshalling bool value: %v", err)
 	}
 
-	value := m.Get("field")
+	value, _ := m.GetAny("field")
 	if !reflect.DeepEqual(value, "yes") {
 		t.Fatalf("Marshalled boolean value is invalid.\nExpected: yes\nReceived: %+v", value)
 	}
@@ -123,7 +123,7 @@ func TestMarshalBoolFalse(t *testing.T) {
 		t.Fatalf("Error marshalling bool value: %v", err)
 	}
 
-	value := m.Get("field")
+	value, _ := m.GetAny("field")
 	if !reflect.DeepEqual(value, "no") {
 		t.Fatalf("Marshalled boolean value is invalid.\nExpected: no\nReceived: %+v", value)
 	}
@@ -142,7 +142,7 @@ func TestMarshalBoolTruePtr(t *testing.T) {
 		t.Fatalf("Error marshalling pointer to bool value: %v", err)
 	}
 
-	value := m.Get("field")
+	value, _ := m.GetAny("field")
 	if !reflect.DeepEqual(value, "yes") {
 		t.Fatalf("Marshalled boolean pointer value is invalid.\nExpected: yes\nReceived: %+v", value)
 	}
@@ -161,7 +161,7 @@ func TestMarshalBoolFalsePtr(t *testing.T) {
 		t.Fatalf("Error marshalling pointer to bool value: %v", err)
 	}
 
-	value := m.Get("field")
+	value, _ := m.GetAny("field")
 	if !reflect.DeepEqual(value, "no") {
 		t.Fatalf("Marshalled boolean pointer value is invalid.\nExpected: no\nReceived: %+v", value)
 	}
@@ -179,7 +179,7 @@ func TestMarshalBoolNilPtr(t *testing.T) {
 		t.Fatalf("Error marshalling pointer to bool value: %v", err)
 	}
 
-	value := m.Get("field")
+	value, _ := m.GetAny("field")
 	if value != nil {
 		t.Fatalf("Marshalled nil boolean pointer value is present.\nReceived: %+v", value)
 	}
@@ -197,7 +197,7 @@ func TestMarshalInt(t *testing.T) {
 		t.Fatalf("Error marshalling int value: %v", err)
 	}
 
-	value := m.Get("field")
+	value, _ := m.GetAny("field")
 	if !reflect.DeepEqual(value, "23") {
 		t.Fatalf("Marshalled int value is invalid.\nExpected: 23\nReceived: %+v", value)
 	}
@@ -215,7 +215,7 @@ func TestMarshalInt2(t *testing.T) {
 		t.Fatalf("Error marshalling int value: %v", err)
 	}
 
-	value := m.Get("field")
+	value, _ := m.GetAny("field")
 	if !reflect.DeepEqual(value, "-23") {
 		t.Fatalf("Marshalled int value is invalid.\nExpected: -23\nReceived: %+v", value)
 	}
@@ -233,7 +233,7 @@ func TestMarshalInt8(t *testing.T) {
 		t.Fatalf("Error marshalling int8 value: %v", err)
 	}
 
-	value := m.Get("field")
+	value, _ := m.GetAny("field")
 	if !reflect.DeepEqual(value, "23") {
 		t.Fatalf("Marshalled int8 value is invalid.\nExpected: 23\nReceived: %+v", value)
 	}
@@ -251,7 +251,7 @@ func TestMarshalUint(t *testing.T) {
 		t.Fatalf("Error marshalling uint value: %v", err)
 	}
 
-	value := m.Get("field")
+	value, _ := m.GetAny("field")
 	if !reflect.DeepEqual(value, "23") {
 		t.Fatalf("Marshalled uint value is invalid.\nExpected: 23\nReceived: %+v", value)
 	}
@@ -269,7 +269,7 @@ func TestMarshalUint8(t *testing.T) {
 		t.Fatalf("Error marshalling uint8 value: %v", err)
 	}
 
-	value := m.Get("field")
+	value, _ := m.GetAny("field")
 	if !reflect.DeepEqual(value, "23") {
 		t.Fatalf("Marshalled uint8 value is invalid.\nExpected: 23\nReceived: %+v", value)
 	}
@@ -290,7 +290,7 @@ func TestMarshalEnumType(t *testing.T) {
 		t.Fatalf("Error marshalling enum type value: %v", err)
 	}
 
-	value := m.Get("field")
+	value, _ := m.GetAny("field")
 	if value.(string) != string(testValue) {
 		t.Fatalf("Marshalled enum type value is invalid.\nExpected: %+v\nReceived: %+v", testValue, value)
 	}
@@ -310,13 +310,12 @@ func TestMarshalEmbeddedMap(t *testing.T) {
 		t.Fatalf("Error marshalling map value: %v", err)
 	}
 
-	value := m.Get("field")
-	field, ok := value.(*Message)
+	field, ok := m.GetSection("field")
 	if !ok {
 		t.Fatalf("Embedded map key was not marshaled as a sub-message")
 	}
 
-	value = field.Get("sub")
+	value, _ := field.GetAny("sub")
 	if !reflect.DeepEqual(value, goldMarshaled) {
 		t.Fatalf("Marshalled map value is invalid.\nExpected: %+v\nReceived: %+v", goldMarshaled, value)
 	}
@@ -340,13 +339,10 @@ func TestMarshalEmbeddedStruct(t *testing.T) {
 		t.Fatalf("Errorf marshalling embedded struct: %v", err)
 	}
 
-	value := m.Get("embedded")
-	embedded, ok := value.(*Message)
+	value, ok := m.GetAny("embedded", "field")
 	if !ok {
 		t.Fatalf("Embedded struct was not marshalled as a sub-message")
 	}
-
-	value = embedded.Get("field")
 	if !reflect.DeepEqual(value, testValue) {
 		t.Fatalf("Marshalled embedded struct value is invalid.\nExpected: %+v\nReceived: %+v", testValue, value)
 	}
@@ -370,7 +366,7 @@ func TestMarshalInline(t *testing.T) {
 		t.Fatalf("Error marshalling inlined embedded struct: %v", err)
 	}
 
-	value := m.Get("field")
+	value, _ := m.GetAny("field")
 	if !reflect.DeepEqual(value, testValue) {
 		t.Fatalf("Marshalled inlined embedded value is invalid.\nExpected: %+v\nReceived: %+v", testValue, value)
 	}
@@ -410,12 +406,12 @@ func TestMarshalInlineComposite(t *testing.T) {
 		t.Fatalf("Error marshalling inlined embedded struct: %v", err)
 	}
 
-	value := m.Get("field")
+	value, _ := m.GetAny("field")
 	if !reflect.DeepEqual(value, testValue) {
 		t.Fatalf("Marshalled inlined embedded value is invalid.\nExpected: %+v\nReceived: %+v", testValue, value)
 	}
 
-	value = m.Get("other")
+	value, _ = m.GetAny("other")
 	if !reflect.DeepEqual(value, otherValue) {
 		t.Fatalf("Marshalled inlined embedded value is invalid.\nExpected: %+v\nReceived: %+v", otherValue, value)
 	}

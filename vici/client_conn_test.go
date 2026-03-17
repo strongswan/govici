@@ -112,12 +112,12 @@ func (ts *testServer) commandHandlerStrcat(in *Message) (*Message, error) {
 		ptype: pktCmdResponse,
 	}
 
-	a, ok := in.Get("a").(string)
+	a, ok := in.GetValue("a")
 	if !ok {
 		return nil, errors.New("malformed message")
 	}
 
-	b, ok := in.Get("b").(string)
+	b, ok := in.GetValue("b")
 	if !ok {
 		return nil, errors.New("malformed message")
 	}
@@ -595,7 +595,7 @@ func TestClientConnCall(t *testing.T) {
 		t.Fatalf("Unexpected failure: %v", err)
 	}
 
-	c, ok := out.Get("c").(string)
+	c, ok := out.GetValue("c")
 	if !ok || c != "test123" {
 		t.Fatalf("Expected field c=test123 in %s", out)
 	}
@@ -644,7 +644,7 @@ func TestClientConnNotify(t *testing.T) {
 				if ev.Name != "event-simple" {
 					t.Fatalf("Received unexpected message %s", ev.Name)
 				}
-				if v, ok := ev.Message.Get("index").(string); !ok || v != strconv.Itoa(i) {
+				if v, ok := ev.Message.GetValue("index"); !ok || v != strconv.Itoa(i) {
 					t.Fatalf("Unexpected message contents: %s", ev.Message)
 				}
 			case <-time.After(3 * time.Second):
@@ -678,12 +678,12 @@ func TestClientConnStream(t *testing.T) {
 			t.Fatalf("Unexpected failure: %v", err)
 		}
 
-		if v, ok := m.Get("index").(string); ok {
+		if v, ok := m.GetValue("index"); ok {
 			if v != strconv.Itoa(i) {
 				t.Fatalf("Unexpected message contents: %s", m)
 			}
 			i++
-		} else if _, ok := m.Get("done").(string); !ok {
+		} else if _, ok := m.GetValue("done"); !ok {
 			t.Fatalf("Unexpected non-event message contents: %s", m)
 		}
 	}

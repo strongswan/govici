@@ -115,7 +115,7 @@ func TestCommandRequest(t *testing.T) {
 		t.Fatalf("Failed to get charon version information: %v", err)
 	}
 
-	if d := resp.Get("daemon"); d == "" {
+	if d, ok := resp.GetValue("daemon"); !ok || d == "" {
 		t.Fatal("Expected non-empty value at key 'daemon'")
 	}
 }

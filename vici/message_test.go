@@ -625,20 +625,6 @@ func TestUnmarshalMessageNestedNilPtr(t *testing.T) {
 	}
 }
 
-func TestMessageGet(t *testing.T) {
-	v := goldMessage.Get("key1")
-	if value, ok := v.(string); !ok {
-		t.Fatalf("Expected %v to be string: received %T", value, value)
-	} else if value != "value1" {
-		t.Fatalf("Expected 'key1' to be 'value1': received %v", value)
-	}
-
-	v = goldMessage.Get("invalid")
-	if v != nil {
-		t.Fatalf("Expected nil for Get on non-existent key: received %v", v)
-	}
-}
-
 func TestMessageGetAny(t *testing.T) {
 	table := []struct {
 		keys   []string
@@ -1083,8 +1069,9 @@ func TestMessageSetTypeConversion(t *testing.T) {
 			t.Fatalf("unexpected error setting supported type '%T': %v", c.in, err)
 		}
 
-		if !reflect.DeepEqual(c.out, m.Get("test")) {
-			t.Fatalf("got incorrect conversion '%T'\nexpected: %v\n got: %v", c.in, c.out, m.Get("test"))
+		got, _ := m.GetAny("test")
+		if !reflect.DeepEqual(c.out, got) {
+			t.Fatalf("got incorrect conversion '%T'\nexpected: %v\n got: %v", c.in, c.out, got)
 		}
 	}
 }
@@ -1103,7 +1090,7 @@ func TestMessageUniqueKeys(t *testing.T) {
 		t.Fatalf("Unexpected error setting string in message: %v", err)
 	}
 
-	if v := m.Get("key1"); v.(string) != "newValue" {
+	if v, _ := m.GetValue("key1"); v != "newValue" {
 		t.Fatalf("Expected old value of 'key1' to be overwritten: key1=%v", v)
 	}
 
