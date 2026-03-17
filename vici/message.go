@@ -284,6 +284,8 @@ func (m *Message) Unset(key string) {
 //
 // The value returned by Get is the internal message representation of that
 // field, which means the type is either string, []string, or *Message.
+//
+// Deprecated: Use one of GetValue, GetList, GetSection, or GetAny instead.
 func (m *Message) Get(key string) any {
 	v, ok := m.data[key]
 	if !ok {
